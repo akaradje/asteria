@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {portfolio}=require('../src/planning/craft-portfolio'),{support}=require('../src/knowledge/refine-capability');
+const world={REFINE:{max:15,chance:[100]},REFINE_HIGH:{wing:.01},REFINE_STAR:{slots:['wing']}};
+assert.equal(support('wing',world).state,'supported');assert.equal(support('wing',{REFINE:world.REFINE}).state,'unknown');
+const wiki={monsters:{monsters:[{id:'mob',kind:'normal',level:100,dropTable:[{item:'Ore',ratePct:100}]}]},maps:{maps:[{id:'map',kind:'field',levelMin:100,monsters:{normal:['mob']}}]}};
+const row=(id,more)=>({id,ready:false,missing:[],cost:{},reqLv:100,gain:1,valuePerCopper:1,...more});
+const result=portfolio([row('sameLegendary',{ready:true,gain:100}),row('missingLegendary',{goalPromotion:true,missing:[{name:'Ore',have:0,want:1}]} )],{lv:120},{build:'fixture'},wiki);
+assert.equal(result.selected.id,'missingLegendary','Snipe historical failure: ready replacement cannot eclipse the missing Legendary slot');
+console.log('PASS T48/T49: missing Legendary milestone first; native wing support and unknown capability');

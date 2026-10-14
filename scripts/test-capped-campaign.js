@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('assert/strict'),e=require('../src/economy'),p=require('../src/planning/capped-campaign');
+const root=process.cwd(),cat=e.loadCatalog(root,e.newestBuild(root)),wiki=e.loadWiki(root),s={lv:120,job:'starweaver',jobLv:50,coins:300000,materials:{...cat.world.ASCEND.items},bag:[],equip:{},bagTier:0};
+const pet=cat.world.MONSTERS.find(m=>m.kind==='normal').id;s.pets={[pet]:0};s.petActive=pet;
+const instance={root,lastSave:s,catalog:()=>cat};let plan=p.plan(instance);assert.equal(plan.phase,'class');assert.equal(plan.target,'chronomagus');assert(plan.ready);
+s.materials['Tyrant Ember']=0;plan=p.plan(instance);assert(!plan.ready);assert(plan.missing.some(x=>x.name==='Tyrant Ember'));
+const now=Date.now(),boss={id:'ignar_the_flame_tyrant',map:'n3',up:true,next:0};let h=p.chooseHunt(plan,s,wiki,{_receivedAt:now,now,list:[boss]},now);assert.equal(h.target.monsterId,boss.id);
+assert.equal(p.chooseHunt(plan,s,wiki,{_receivedAt:now-60000,now,list:[boss]},now).target,null,'stale boss board cannot imply alive');
+h=p.chooseHunt(plan,s,wiki,{_receivedAt:now,now,list:[{...boss,up:false,next:now+300000}]},now);assert.equal(h.target,null);assert.equal(h.next.nextAt,now+300000);
+s.job='chronomagus';plan=p.plan(instance);assert.equal(plan.phase,'wing');assert(plan.wing.recipeVerified);assert(plan.missing.some(x=>x.name==='Celestial Plume'));
+assert(plan.wing.stages.length>=2);assert(plan.wing.requirements.some(x=>x.name==='Ancient Bark'&&x.want===5));
+s.lv=119;assert.equal(p.plan(instance).phase,'wing','first wing campaign must run before cap');s.equip.wing=p.plan(instance).target;assert.equal(p.plan(instance).phase,'complete','one usable equipped wing releases the equipment queue');
+console.log('PASS capped class before wings, exact first recipe chain, missing core, authoritative alive/respawn board, stale rejection and uncapped progression');

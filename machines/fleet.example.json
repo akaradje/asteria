@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "leader": "ExampleTankA",
+  "ssh": {
+    "host": "deploy@192.0.2.11",
+    "exchange": "/opt/asteria-node-a/asteria/scripts/fleet-exchange.py"
+  },
+  "members": [
+    {
+      "machine": "tum",
+      "slot": 0,
+      "charName": "ExampleTankA",
+      "baseJob": "knight"
+    },
+    {
+      "machine": "tum",
+      "slot": 1,
+      "charName": "ExampleHealA",
+      "baseJob": "priest"
+    },
+    {
+      "machine": "tum",
+      "slot": 2,
+      "charName": "ExampleArcherA",
+      "baseJob": "ranger"
+    },
+    {
+      "machine": "windows",
+      "slot": 0,
+      "charName": "ExampleRogue",
+      "baseJob": "assassin"
+    },
+    {
+      "machine": "windows",
+      "slot": 1,
+      "charName": "ExampleMage",
+      "baseJob": "mage"
+    },
+    {
+      "machine": "windows",
+      "slot": 2,
+      "charName": "ExampleMonk",
+      "baseJob": "monk"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+const assert=require('assert/strict'),{GameInstance}=require('../src/instance');
+(async()=>{const i=Object.create(GameInstance.prototype);i.evalTimeoutMs=20;i.page=null;await assert.rejects(i.eval('1'),/unavailable/);i.page={evaluate(){throw Error('closed');}};await assert.rejects(i.eval('1'),/closed/);await new Promise(r=>setTimeout(r,40));console.log('PASS null/closed page rejects without an orphan watchdog during recycling');})().catch(e=>{console.error(e);process.exitCode=1;});

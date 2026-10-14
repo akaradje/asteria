@@ -1,0 +1,97 @@
+'use strict';
+const fs=require('fs'),path=require('path'),crypto=require('crypto');
+const {isGuildHall,sameGatherRoom}=require('../runtime/room-policy');
+const fresh=(at,age,now)=>Number.isFinite(at)&&at<=now+10000&&now-at<age;
+class FleetActivity{
+ constructor(root,config,machine,{now=Date.now}={}){this.now=now;this.config=config;this.machine=machine;this.file=path.join(root,'logs','fleet','activity-workflow.json');try{this.state=JSON.parse(fs.readFileSync(this.file));}catch{this.state={phase:'IDLE'};}this.dispatchFile=path.join(root,'logs','fleet','activity-dispatch-'+machine+'.json');try{this.handled=new Set(JSON.parse(fs.readFileSync(this.dispatchFile)));}catch{this.handled=new Set();}if(this.state.phase==='OPENING'){this.state.phase='UNCERTAIN';this.state.reason='restart during opening; reconcile before retry';this.persist();}}
+ markHandled(key){this.handled.add(key);fs.mkdirSync(path.dirname(this.dispatchFile),{recursive:true});fs.writeFileSync(this.dispatchFile+'.tmp',JSON.stringify([...this.handled].slice(-120)));fs.renameSync(this.dispatchFile+'.tmp',this.dispatchFile);}
+ openingAttempts(key){return [...this.handled].filter(k=>k.startsWith(key+':not-sent:')).length;}
+ persist(){fs.mkdirSync(path.dirname(this.file),{recursive:true});fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.state));fs.renameSync(this.file+'.tmp',this.file);}
+ begin(kind,build,{enabled=false,from=1,day=null,requestId=null,participants=null,leader=null,cohortRevision=null}={}){if(!enabled||!['tower','rift','guild'].includes(kind)||!['IDLE','COMPLETE','FINISHED','WITHDRAWN'].includes(this.state.phase))return false;this.state={id:crypto.randomUUID(),kind,build,from,day,requestId,phase:'GATHERING',at:this.now(),deadline:this.now()+600000,leader:leader||this.config.leader,participants:participants||this.config.members,cohortRevision};this.persist();return true;}
+ reconcile(sources,party){const now=this.now(),r=this.state;if(['IDLE','COMPLETE','FINISHED','WITHDRAWN'].includes(r.phase))return r;const roster=r.participants||this.config.members;const members=roster.map(x=>{const src=sources.find(s=>s.machine===x.machine),m=src?.members.find(m=>m.charName===x.charName&&m.slot===x.slot);return {src,m};});
+ if(r.phase==='UNCERTAIN'){const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg',leader=members.find(({m})=>m?.charName===(r.leader||this.config.leader)),s=leader?.m?.activityState?.[type];
+  if(leader?.src?.build===r.build&&s&&fresh(s.at,45000,now)&&s.run?.member&&!s.run.done){r.runId=s.run.id;r.phase=now<r.joinDeadline?'JOINING':'WITHDRAWING';r.deadline=Math.max(r.deadline,now+180000);r.reason='reconciled existing server run; never replayed opening';}
+  else if(now-(r.openAt||r.at)>120000&&members.every(({src,m})=>src&&fresh(src.at,15000,now)&&src.build===leader?.src?.build&&m?.status==='playing'&&m.activityState?.[type]?.build===src.build&&m.activityState?.[type]&&fresh(m.activityState[type].at,45000,now)&&(!m.activityState[type].run||m.activityState[type].run.done))){r.phase='FINISHED';r.finishedAt=now;r.evidence='participant_fresh_server_states_no_active_run_no_replay';r.outcomeBuild=leader?.src?.build;r.reason='previous outcome unknown; replan remaining real quotas';this.persist();return r;}else return r;
+ }
+ if(['JOINING','RUNNING','RECONCILING'].includes(r.phase)&&r.runId&&members.every(({src,m})=>src?.build===r.build&&fresh(src.at,15000,now)&&m?.activityResult?.build===r.build&&m.activityResult.runId===r.runId&&m.activityResult.completed&&m.activityResult.activity===(r.kind==='rift'?'dungeon':r.kind)&&m.activityResult.at>=r.openAt)){r.phase='COMPLETE';r.finishedAt=now;r.evidence='participant_server_completion_rewards';r.at=now;this.persist();return r;}
+ if(now>r.deadline){const unopened=['GATHERING','PREPARING'].includes(r.phase)&&!r.openAt&&!r.runId;r.phase=unopened?'WITHDRAWN':'UNCERTAIN';if(unopened)r.finishedAt=now;r.reason=unopened?'pre-opening preparation deadline; no quota command sent':'workflow deadline; no automatic restart';this.persist();return r;}
+ if(r.phase==='PREPARING'&&!r.openAt&&!r.runId){
+  // Gathering travel has its own budget. Once gathered, repeated readiness/
+  // quota checks must not consume that entire budget and starve equipment work.
+  // Local purchase journals continue to fence their own unfinished operations.
+  if(!Number.isFinite(r.preparedAt))r.preparedAt=now;
+  if(now-r.preparedAt>=180000){r.phase='WITHDRAWN';r.finishedAt=r.at=now;r.evidence='pre_open_preparation_timeout_no_entry';r.reason='pre-opening readiness not satisfied within 180 seconds; no quota command dispatched; resume personal progression';this.persist();return r;}
+ }
+ // An OBT reset invalidates the old high-level gathering assumption. Release
+ // only an unopened workflow; a started run still needs normal reconciliation.
+ if(['GATHERING','PREPARING'].includes(r.phase)&&!r.openAt&&!r.runId){
+  const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg';
+  const under=members.filter(({src,m})=>{const s=m?.activityState?.[type];return src?.build===r.build&&fresh(src.at,15000,now)&&fresh(m?.lastSaveAt,30000,now)&&s?.build===r.build&&fresh(s.at,45000,now)&&Number.isInteger(s.minLv)&&Number.isInteger(m?.lv)&&m.lv<s.minLv;});
+  if(under.length){r.phase='WITHDRAWN';r.finishedAt=r.at=now;r.reason='server minimum level not met; resume character progression; no quota command sent';r.evidence='fresh_member_level_and_server_minLv';this.persist();return r;}
+ }
+ const alive=members.every(({src,m})=>src?.build===r.build&&fresh(src.at,15000,now)&&m?.status==='playing'&&!m.recycling&&(['RUNNING','RECONCILING','WITHDRAWING'].includes(r.phase)||(r.phase==='JOINING'&&m.activityState?.[r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg']?.run?.member)||fresh(m.lastSaveAt,30000,now))&&fresh(m.livePos?.at,10000,now));
+ if(!alive&&['GATHERING','PREPARING'].includes(r.phase)){r.healthGapAt??=now;if(!r.openAt&&!r.runId&&now-r.healthGapAt>=30000){r.phase='WITHDRAWN';r.finishedAt=r.at=now;r.reason='members unavailable for 30 seconds before opening; resume personal work';r.evidence='no_quota_command_dispatched';this.persist();return r;}r.at=now;r.reason='waiting for fresh six-member evidence before opening; preparation retained; no quota command sent';this.persist();return r;}
+ if(!alive&&['JOINING','RUNNING'].includes(r.phase)){
+  const definite=members.some(({src,m})=>src&&fresh(src.at,15000,now)&&(src.build!==r.build||m?.recycling||m&&['stopping','stopped','failed'].includes(m.status)));
+  if(!definite){r.healthGapAt??=now;if(now-r.healthGapAt<15000){r.reason='bounded telemetry gap; preserving existing run, no new opening';r.at=now;this.persist();return r;}}
+ }
+ if(alive)delete r.healthGapAt; if(!alive){r.reason='wait for six fresh current-build members';if(['OPENING','JOINING','RUNNING'].includes(r.phase)){r.phase='WITHDRAWING';r.reason='team/build health changed';r.healthEvidence={at:now,members:members.map(({src,m},n)=>({name:roster[n].charName,sourceAge:src?now-src.at:null,build:src?.build||null,status:m?.status||null,recycling:!!m?.recycling,positionAge:Number.isFinite(m?.livePos?.at)?now-m.livePos.at:null,saveAge:Number.isFinite(m?.lastSaveAt)?now-m.lastSaveAt:null}))};r.deadline=Math.max(r.deadline,now+180000);}r.at=now;this.persist();return r;}
+ if(['JOINING','RUNNING'].includes(r.phase)){
+  const healer=roster.find(x=>x.baseJob==='priest')?.charName;
+  const critical=members.filter(({m})=>fresh(m.vitals?.at,15000,now)&&((!m.livePos.dead&&Number.isFinite(m.vitals.hp)&&m.vitals.hp<.25)||(m.charName===healer&&Number.isFinite(m.vitals.mp)&&m.vitals.mp<.15)));
+  const unknown=members.filter(({m})=>!fresh(m.vitals?.at,15000,now)||!Number.isFinite(m.vitals.hp)||(m.charName===healer&&!Number.isFinite(m.vitals.mp)));
+  if(critical.length){r.phase='WITHDRAWING';r.reason='HP/MP withdrawal threshold';r.vitalsEvidence={at:now,members:critical.map(({m})=>({name:m.charName,hp:m.vitals.hp,mp:m.vitals.mp,at:m.vitals.at}))};}
+  else if(unknown.length){r.vitalsGapAt??=now;r.reason='bounded missing vitals; waiting for observed HP/MP';if(now-r.vitalsGapAt<15000){r.at=now;this.persist();return r;}r.phase='WITHDRAWING';r.reason='HP/MP evidence unavailable for 15 seconds';r.vitalsEvidence={at:now,members:unknown.map(({m})=>({name:m.charName,hp:m.vitals?.hp??null,mp:m.vitals?.mp??null,at:m.vitals?.at??null}))};}
+  else{delete r.vitalsGapAt;if(r.reason?.startsWith('bounded '))delete r.reason;}
+ }
+ const acknowledged=phase=>members.every(({m})=>m.workflowAck?.id===r.id&&m.workflowAck?.phase===phase&&m.workflowAck.ok&&fresh(m.workflowAck.at,30000,now));
+ if(r.phase==='GATHERING'&&acknowledged('GATHERING')){r.phase='PREPARING';r.preparedAt=now;}
+ if(r.phase==='PREPARING'&&acknowledged('PREPARING')){
+  const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg',states=members.map(({m})=>m.activityState?.[type]);const leader=members.find(({m})=>m.charName===r.leader)?.m;
+  const fullParty=r.kind==='guild'?states.every(s=>s?.guildId&&s.guildId===leader?.activityState?.gd?.guildId):party?.leader===r.leader&&fresh(party.checkedAt,30000,now)&&members.every(({m})=>m.teamPartyId===party.id&&party.members.includes(m.charName));
+  const ready=members.every(({m})=>m.readiness?.ready&&fresh(m.readiness.at,30000,now)&&m.vitals?.hp>=.85&&m.vitals?.mp>=.5&&sameGatherRoom(m.livePos.room,r.kind));
+  if(r.kind==='guild'&&(!(leader?.activityState?.gd?.guildLeft>0)||!['leader','officer'].includes(leader.activityState.gd.rank)||!leader.activityState.gd.guildId||states.some(s=>s.guildId!==leader.activityState.gd.guildId))){r.reason='guild identity, officer rank or guild quota changed';r.at=now;this.persist();return r;}
+  if(!fullParty||!ready||states.some((s,n)=>!s||s.build!==r.build||!fresh(s.at,45000,now)||!(s.left>0)||!Number.isInteger(s.minLv)||!Number.isInteger(members[n].m.lv)||members[n].m.lv<s.minLv||r.kind==='rift'&&s.open!==true||s.run&&!s.run.done)){r.reason='party, readiness, levels or fresh quotas not satisfied';this.persist();return r;}
+  if(r.kind==='tower'){const common=(states[0].starts||[1]).filter(f=>states.every(s=>(s.starts||[1]).includes(f)));if(!common.length){r.reason='no shared floor';return r;}r.from=Math.max(...common.filter(f=>Number.isInteger(f)&&f>=1&&f<=100));if(!Number.isFinite(r.from)){r.reason='no verified shared checkpoint';return r;}}
+  if(!leader)return r;r.phase='OPENING';r.openAt=now;r.joinDeadline=now+(r.kind==='guild'?270000:120000);r.deadline=now+(r.kind==='tower'?(101-r.from)*Math.max(300,Math.min(600,states[0].floorSec||300))*1000+600000:2400000);
+ }
+ if(r.phase==='OPENING'){
+  const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg',leader=members.find(({m})=>m.charName===r.leader)?.m,state=leader?.activityState?.[type],run=state?.run,dispatch=leader?.activityDispatchResult;
+  const joinUntil=Number.isFinite(r.joinDeadline)?r.joinDeadline:r.openAt+(r.kind==='guild'?270000:120000);
+  if(state?.build===r.build&&fresh(state.at,45000,now)&&run?.id&&run.member&&!run.done){r.runId=run.id;r.phase=now<joinUntil?'JOINING':'WITHDRAWING';r.reason=now<joinUntil?undefined:'confirmed run arrived after joining window; withdraw existing run without another opening';}
+  else if(dispatch?.id===r.id&&dispatch.phase==='OPENING'&&dispatch.sent===false&&dispatch.attempts>=2&&Number.isFinite(dispatch.at)&&dispatch.at>=r.openAt&&fresh(dispatch.at,15000,now)&&members.every(({m})=>{const s=m?.activityState?.[type];return s?.build===r.build&&fresh(s.at,45000,now)&&(!s.run||s.run.done);})){r.phase='WITHDRAWN';r.finishedAt=r.at=now;r.evidence='opening_not_sent_attempt_budget';r.reason='opening rejected before dispatch twice; resume personal progression: '+String(dispatch.reason||'native preflight rejected').slice(0,240);this.persist();return r;}
+  else if(Number.isFinite(joinUntil)&&now>=joinUntil){r.phase='UNCERTAIN';r.reason='opening window elapsed without confirmed run; reconcile original attempt, never replay';r.at=now;this.persist();return r;}
+ }
+ if(r.phase==='JOINING'){const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg';if(members.every(({m})=>m.activityState?.[type]?.run?.id===r.runId&&m.activityState[type].run.member&&!m.activityState[type].run.done)){r.phase='RUNNING';delete r.reason;}else if(now>=r.joinDeadline){r.phase='WITHDRAWING';r.reason='incomplete team at join deadline';}}
+ if(r.phase==='RUNNING'){const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg',states=members.map(({m})=>m.activityState?.[type]);if(states.every(s=>s&&s.build===r.build&&fresh(s.at,45000,now)&&(s.run?.done||!s.run))){r.phase='RECONCILING';r.reconcileAt=now;}}
+ if(r.phase==='RECONCILING'&&members.every(({m})=>m.activityResult?.build===r.build&&m.activityResult?.runId===r.runId&&m.activityResult?.completed&&m.activityResult.activity===(r.kind==='rift'?'dungeon':r.kind)&&m.activityResult.at>=r.openAt)){r.phase='COMPLETE';r.finishedAt=now;r.evidence='participant_server_completion_rewards';}
+ if(r.phase==='RECONCILING'&&now-r.reconcileAt>30000&&members.every(({m})=>{const s=m.activityState?.[r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg'];return s&&fresh(s.at,45000,now)&&(!s.run||s.run.done); })){r.phase='FINISHED';r.finishedAt=now;r.reason='run ended; full clear not proven for all participants';r.evidence='fresh_server_run_end_only';}
+ if(r.phase==='WITHDRAWING'&&acknowledged('WITHDRAWING'))r.phase='WITHDRAWN';r.at=now;this.persist();return r;
+ }
+ async act(i,intent,build){const now=this.now();if(!intent||intent.deadline<now||!fresh(intent.at,15000,now)){
+   const previous=i.fleetActivityIntent;
+   // A transport gap may pause dispatch, but must not release navigation to farming.
+   // Retain only the already accepted ownership; never dispatch stale instructions.
+   i.teamControl=!!previous&&previous.build===build&&(previous.participants||this.config.members).some(m=>m.machine===this.machine&&m.slot===i.slot)&&previous.deadline>=now&&!['IDLE','COMPLETE','FINISHED','WITHDRAWN','UNCERTAIN'].includes(previous.phase);
+   return;
+  }if(intent.build!==build||!(intent.participants||this.config.members).some(m=>m.charName===intent.leader)||!['tower','rift','guild'].includes(intent.kind)||!(intent.participants||this.config.members).some(m=>m.machine===this.machine&&m.slot===i.slot&&m.charName===(i.character?.name||i.credentials?.charName)&&(!m.actorId||m.actorId===i.actorIdentity?.actorId))){i.teamControl=false;return;}
+  if(['IDLE','COMPLETE','FINISHED','WITHDRAWN','UNCERTAIN'].includes(intent.phase)){i.teamControl=false;i.fleetActivityIntent=intent;if(i.activityResume){i.campaignGoal=i.activityResume.campaignGoal;i.goal=null;i.teamGoal=i.activityResume.teamGoal;delete i.activityResume;i.refreshGoal?.();}return;}i.teamControl=true;i.fleetActivityIntent=intent;
+  if(i.teamTradeIntent?.offer&&[i.teamTradeIntent.offer.donor,i.teamTradeIntent.offer.receiver].includes(i.credentials?.charName)&&!['IDLE','CONFIRMED','CANCELLED','UNCERTAIN'].includes(i.teamTradeIntent.phase)){i.teamControl=false;return;}
+  const key=intent.id+':'+intent.phase+':'+i.slot;if(i.workflowAck?.id===intent.id&&i.workflowAck.phase===intent.phase&&i.workflowAck.ok&&this.now()-i.workflowAck.at<10000)return;
+  if(!i.v2?.scheduler||i.recycling||i.status!=='playing')return;
+  return i.v2.scheduler.run('fleet-'+intent.phase,async()=>{if(this.now()>intent.deadline)return;let ok=false;const phase=intent.phase;
+   if(phase==='GATHERING'){i.activityResume||={campaignGoal:i.campaignGoal,teamGoal:i.teamGoal};i.pendingTravel=null;i.campaignGoal=null;i.teamGoal=null;await i.expeditionAuto(false);if(sameGatherRoom(i.livePos?.room,intent.kind))ok=true;else if(intent.kind==='guild'){const home=await i.returnToTown();ok=home?.ok&&(await i.enterGuildHall())?.ok===true;}else ok=(await i.returnToTown())?.ok===true;}
+   if(phase==='PREPARING'){if(typeof i.screen==='function')i.readiness=require('../team-readiness').check(i,await i.screen());if(i.readiness?.ready&&this.now()-i.readiness.at<20000)ok=true;else {if(intent.kind==='guild'&&isGuildHall(i.livePos?.room))await i.returnToTown();ok=(await i.prepareDungeon())?.ready===true;}if(intent.kind==='guild'&&!isGuildHall(i.livePos?.room))ok=(await i.enterGuildHall())?.ok===true&&ok;if(intent.kind==='tower')await i.towerQuery();else if(intent.kind==='guild')await i.guildDungeonQuery();else await i.queryDungeons();}
+   if(phase==='OPENING'&&i.credentials.charName===intent.leader){if(this.handled.has(key))return;const attempts=this.openingAttempts(key);if(attempts>=2){i.activityDispatchResult={id:intent.id,phase,at:this.now(),sent:false,attempts,reason:'persisted native preflight rejection budget exhausted'};return;}this.markHandled(key);i.workflowAck={id:intent.id,phase,ok:false,at:this.now(),sent:true};this.persist();let result;if(intent.kind==='tower')result=await i.towerStart(intent.from);else if(intent.kind==='guild')result=await i.guildDungeonStart();else result=await i.dungeonStart(intent.dungeonId);if(result?.ok===false&&result.sent===false){this.handled.delete(key);this.markHandled(key+':not-sent:'+(attempts+1));}i.activityDispatchResult={id:intent.id,phase,at:this.now(),sent:result?.sent??(result?.ok===true?true:null),attempts:attempts+(result?.sent===false?1:0),reason:result?.reason||null};ok=false;}
+   if(phase==='JOINING'&&now<intent.joinDeadline){const type=intent.kind==='tower'?'tw':intent.kind==='guild'?'gd':'dg',state=await i.socialLast(type);ok=state?.run?.id===intent.runId&&state.run.member;if(!ok&&!this.handled.has(key)){this.markHandled(key);let result;if(intent.kind==='tower')result=await i.towerJoin(intent.runId,intent.joinDeadline);else if(intent.kind==='guild')result=await i.guildDungeonJoin(intent.runId);else result=await i.dungeonJoin(intent.runId);if(result?.ok===false&&result.sent===false){this.handled.delete(key);fs.writeFileSync(this.dispatchFile+'.tmp',JSON.stringify([...this.handled].slice(-120)));fs.renameSync(this.dispatchFile+'.tmp',this.dispatchFile);}}}
+   if(phase==='RUNNING'){await i.closeGamePanel?.();await i.expeditionAuto(true);ok=true;}
+   if(phase==='RECONCILING'){ok=true;}
+   if(phase==='WITHDRAWING'){await i.expeditionAuto(false);if(intent.kind==='tower')await i.towerQuit();else await i.dungeonQuit();ok=!/^(tw|dx|gd|pv)/.test(i.livePos?.room||'');}
+   if(phase==='PREPARING'&&i.readiness&&fresh(i.readiness.at,20000,this.now()))i.vitals={hp:i.readiness.hp,mp:i.readiness.mp,at:i.readiness.at};i.workflowAck={id:intent.id,phase,ok,at:this.now()};return i.workflowAck;
+  },{priority:2,contract:require('../runtime/action-contract').contract(i,'fleet-activity')});
+ }
+ view(){return {...this.state};}
+}
+function publicActivity(i){const latest=i.activityEvidence?.latest||{},out={};for(const k of ['tw','dg','gd']){const x=latest[k];if(x){const s=x.state;out[k]={at:x.at,build:x.build,left:s.left,guildLeft:s.guildLeft,guildId:s.guild?.id||i.activityEvidence?.latest?.guild?.state?.id||null,rank:s.rank||null,now:s.now||null,starts:s.starts,minLv:s.minLv,floorSec:s.floorSec,open:s.open===true,run:s.run?{id:s.run.id,member:!!s.run.member,done:s.run.done||null,floor:s.run.floor}:null};}}return out;}
+function publicDispatch(i){const r=i.activityDispatchResult;if(!r||typeof r.id!=='string'||r.phase!=='OPENING'||!Number.isFinite(r.at))return null;return {id:r.id.slice(0,120),phase:r.phase,at:r.at,sent:typeof r.sent==='boolean'?r.sent:null,attempts:Number.isInteger(r.attempts)?Math.min(2,Math.max(0,r.attempts)):0,reason:typeof r.reason==='string'?r.reason.slice(0,240):null};}
+module.exports={FleetActivity,publicActivity,publicDispatch};

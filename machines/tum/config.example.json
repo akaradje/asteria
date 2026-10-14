@@ -1,0 +1,29 @@
+{
+  "platform": "linux",
+  "args": {
+    "runtime-v2": true,
+    "game-knowledge": true,
+    "n": 3,
+    "nodraw": true,
+    "no-frames": true,
+    "windowcost": 1000,
+    "minfree": 300,
+    "recyclebelow": 1200,
+    "recyclegap": 240,
+    "rotate": 0,
+    "purge": 10,
+    "no-audio": true,
+    "stagger": 25,
+    "fps": 25,
+    "split-browsers": false,
+    "full-chrome": true,
+    "lite-textures": true,
+    "lite-world-art": true,
+    "w": 480,
+    "h": 270,
+    "criticalfree": 500,
+    "federation": true,
+    "partyevery": 15,
+    "serial-boot": true
+  }
+}

@@ -1,0 +1,8 @@
+'use strict';
+const fs=require('fs'),path=require('path'),http=require('http'),{spawn}=require('child_process');
+const root=path.resolve(__dirname,'..'),file=path.join(root,'logs/system-audit/fleet-soak.json'),startedAt=Date.now();let stable=0,stableBuild=null,busy=false;
+function save(extra){fs.writeFileSync(file+'.tmp',JSON.stringify({status:'waiting_for_team',startedAt,longTermVerified:false,...extra}));fs.renameSync(file+'.tmp',file);}
+function request(){return new Promise((resolve,reject)=>{const req=http.get('http://127.0.0.1:4712/api/fleet',res=>{let s='';res.on('data',b=>s+=b);res.on('end',()=>{try{resolve(JSON.parse(s));}catch(e){reject(e);}});});req.setTimeout(22000,()=>req.destroy(Error('dashboard timeout')));req.on('error',reject);});}
+async function check(){if(busy)return;busy=true;try{const s=await request(),build=require('../src/observability/soak-evidence').readyBuild(s);const revision=require('../src/knowledge/system-version').inventory(root).revision,epoch=require('./soak-epoch').aligned(s,revision,build);stable=build&&epoch?build===stableBuild?stable+1:1:0;stableBuild=build;save({lastSample:{at:Date.now(),online:s.online,complete:s.complete},build,consecutiveReadySamples:stable});if(stable>=3){clearInterval(timer);const child=spawn(process.execPath,['scripts/soak-fleet.js','--hours=3','--build='+build],{cwd:root,windowsHide:true,stdio:'inherit'});child.on('exit',code=>process.exit(code||0));}}
+ catch(e){save({lastError:e.message,lastSample:{at:Date.now()}});}finally{busy=false;}}
+save({lastSample:{at:Date.now()}});const timer=setInterval(()=>check(),15000);check();

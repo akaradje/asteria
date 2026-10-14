@@ -1,0 +1,4 @@
+'use strict';
+const fs=require('fs'),{sshCapture}=require('../src/runtime/fleet-transport'),fleet=require('../machines/fleet.json');
+const code=`const fs=require('fs');const i=JSON.parse(fs.readFileSync('logs/status.json')).instances.find(i=>i.char==='ExampleAccount10');console.log(JSON.stringify({char:i.char,bag:i.bag,bagTier:i.bagTier,cap:i.bagCapacity,coins:i.coins,equip:i.equip,locks:i.locks,refine:i.refine,action:i.endgameCampaign?.action}));`;
+sshCapture(['-n','-o','BatchMode=yes',fleet.ssh.host,`cd /opt/asteria-node-a/asteria && node -e 'eval(Buffer.from("${Buffer.from(code).toString('base64')}","base64").toString())'`],{timeout:20000,maxBuffer:15000},(e,out)=>{if(e){console.error(e.message);process.exitCode=1;}else {fs.writeFileSync('logs/system-audit/windrunner-bag-latest.json',out);console.log(out.trim());}});

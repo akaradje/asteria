@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const {KnowledgeResearch,packet}=require('../src/learning/knowledge-research');
+(async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-research-'));const advisorModule=require('../src/ai-advisor'),settings=advisorModule.settings;
+try{const now=Date.now(),file=path.join(root,'logs/game-knowledge/state.json');fs.mkdirSync(path.dirname(file),{recursive:true});
+ const knowledge={evidenceStore:{active:{generation:'g1',build:'b'},sources:[{status:'received',success:now}],unknowns:[{id:'pet:gate',domain:'pets',reason:'visibility unknown'}],recentChanges:[]}};fs.writeFileSync(file,JSON.stringify(knowledge));
+ assert(packet(knowledge));assert.equal(packet({...knowledge,lastError:'source missing'}),null);assert.equal(packet({evidenceStore:{...knowledge.evidenceStore,sources:[{status:'received',success:now-600001}]}}),null);
+ advisorModule.settings=()=>({typesafe:{model:'jev-latest',key:'never-output',url:'https://api.typesafe.ai/v1/systemone'}});
+ let calls=0;const advisor={busy:false,nextAt:0,async request(cfg,body){calls++;assert.equal(body.model,'jev-latest');assert(!JSON.stringify(body).includes('never-output'));return {answers:{research:{type:'choice',choice:'inspect_0',confidence:.8}}};}};
+ const r=new KnowledgeResearch(root);await r.tick(advisor);assert.equal(r.data.rows[0].status,'valid_choice');assert.equal(r.data.rows[0].dispatched,false);assert(!advisor.busy);r.data.nextAt=0;advisor.nextAt=0;await r.tick(advisor);assert.equal(calls,1,'same evidence not repeatedly purchased');
+ knowledge.evidenceStore.active.generation='g2';fs.writeFileSync(file,JSON.stringify(knowledge));advisor.request=async()=>({answers:{research:{type:'choice',choice:'invented',confidence:1}}});await r.tick(advisor);assert.equal(r.data.failures,1);assert.equal(r.data.rows.length,1);
+ r.data.nextAt=0;advisor.nextAt=0;advisor.request=async()=>{knowledge.evidenceStore.active.generation='g3';fs.writeFileSync(file,JSON.stringify(knowledge));return {answers:{research:{type:'choice',choice:'inspect_0',confidence:.9}}};};await r.tick(advisor);assert.equal(r.data.rows[0].status,'expired_generation');
+ r.data.nextAt=0;advisor.nextAt=0;advisorModule.settings=()=>({typesafe:{model:'other'}});await r.tick(advisor);assert.equal(r.data.lastError,'typesafe_model_mismatch');
+ const reloaded=new KnowledgeResearch(root);assert.equal(reloaded.data.rows.length,2);
+ advisorModule.settings=()=>({typesafe:{model:'jev-latest'}});r.data.nextAt=0;advisor.nextAt=0;knowledge.evidenceStore.active.generation='g4';fs.writeFileSync(file,JSON.stringify(knowledge));
+ const save=r.save;r.save=()=>{throw Error('disk unavailable');};await assert.rejects(()=>r.tick(advisor));assert.equal(advisor.busy,false,'disk failure cannot permanently lock advisor');assert.equal(r.busy,false);r.save=save;
+ console.log('PASS Typesafe bounded supported-choice research, evidence dedup, stale/schema/model rejection, backoff, restart, no dispatch');
+}finally{advisorModule.settings=settings;fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('assert/strict'),{memberEvidence}=require('../src/fleet-dashboard');
+const now=Date.now(),state={running:true},row={status:'playing',lastSaveAt:now-1000};
+assert.equal(memberEvidence(state,row,null,false,true,1000,now).online,true);
+assert.equal(memberEvidence(state,row,null,false,false,1000,now).online,false,'previous run cannot certify online');
+assert.equal(memberEvidence(state,{...row,lastSaveAt:now-24000},null,false,true,24000,now).online,true,'30s snapshot cadence must not fabricate an offline interval when its actual save is fresh');
+assert.equal(memberEvidence(state,row,null,false,true,45000,now).known,false,'old snapshot envelope remains rejected');
+assert.equal(memberEvidence(state,{...row,lastSaveAt:now-30000},null,false,true,24000,now).online,false,'snapshot fallback never extends actual save freshness');
+assert.equal(memberEvidence(state,{...row,lastSaveAt:now-40000},null,false,true,1000,now).known,false);
+assert.equal(memberEvidence({running:false},row,row,true,true,1000,now).online,false);
+assert.equal(memberEvidence(state,row,{status:'playing',lastSaveAt:now-40000},true,true,1000,now).known,false,'stale save is unknown even when publisher is fresh');
+console.log('PASS fresh controller evidence, previous-run refusal, stale snapshot/save unknown, stopped controller cannot certify online');

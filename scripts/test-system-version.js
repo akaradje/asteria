@@ -1,0 +1,31 @@
+'use strict';
+const fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict'),crypto=require('crypto'),vm=require('vm');
+const version=require('../src/knowledge/system-version'),{buildRelease,groups}=require('./build-architecture-release');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-system-version-'));
+async function main(){
+ const real=process.cwd(),build=JSON.parse(fs.readFileSync('machines/fleet-client-release.json')).build;
+ fs.cpSync(path.join(real,'src'),path.join(root,'src'),{recursive:true});
+ const files=Object.keys(version.inventory(real).hashes).filter(p=>!p.startsWith('src/'));
+ const suites=[...new Set(Object.values(groups).flat())];
+ for(const file of [...files,...suites.map(n=>'scripts/test-'+n+'.js')]){fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.copyFileSync(path.join(real,file),path.join(root,file));}
+ const dir=path.join(root,'cache',build,'asteria-online.io');fs.mkdirSync(dir,{recursive:true});for(const n of ['asteria-online-visual-polish.html','asteria-world-system.js','asteria-net.js'])fs.copyFileSync(path.join(real,'cache',build,'asteria-online.io',n),path.join(dir,n));
+ const wiki=JSON.parse(fs.readFileSync('data/wiki.json'));wiki._source.verifiedBuild=build;fs.mkdirSync(path.join(root,'data'));fs.writeFileSync(path.join(root,'data/wiki.json'),JSON.stringify(wiki));
+ const identity=require('../src/knowledge/loaded-source').capture(root,build),state={checkedAt:Date.now(),liveBuild:build,current:{build,id:build+'-fixture',sourceHashes:identity.sourceHashes}};
+ fs.mkdirSync(path.join(root,'logs/game-knowledge'),{recursive:true});fs.writeFileSync(path.join(root,'logs/game-knowledge/state.json'),JSON.stringify(state));
+ const inventory=version.inventory(root);assert(Object.keys(inventory.hashes).includes('src/knowledge/system-version.js'));assert(Object.keys(inventory.hashes).includes('src/public/fleet-layout.js'));assert(Object.keys(inventory.hashes).includes('machines/equipment-goal.json'));assert(!Object.keys(inventory.hashes).some(p=>/account|\.env/.test(p)));
+ const evidence={at:Date.now(),build,sourceRevision:inventory.revision,machine:'unit-fixture-not-deployment',rows:suites.map(suite=>({suite,exit:0,testSha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'scripts/test-'+suite+'.js'))).digest('hex')}))};
+ assert.throws(()=>buildRelease(root,build,{...evidence,sourceRevision:'wrong'}),/test evidence/);assert.throws(()=>buildRelease(root,build,{...evidence,build:'old'}),/test evidence/);assert.throws(()=>buildRelease(root,build,{...evidence,at:Date.now()+10000}),/test evidence/);
+ let release=buildRelease(root,build,evidence);assert.equal(release.version,2);assert.equal(release.features['paid-actions'].fixturePassed,true);assert.equal(release.features.cards.sourceValidated,false,'marker existence is not reviewed card semantics');assert.equal(release.features.boss.limitedProbePassed,false,'never fabricate gameplay proof');
+ let v=version.inspect(root,build,{knowledge:state,loadedSystemRevision:inventory.revision});assert.equal(v.domains.length,18);assert(v.aligned&&v.wikiCurrent&&v.dataCurrent);assert(v.domains.find(r=>r.id==='skills').facts.learnableSkills>0);assert(!v.authorizesActions&&!v.serverVerified);
+ const e=require('../src/economy'),cat=e.loadCatalog(root,build),chain=e.jobChain('chronomagus',cat.world),intWeight=Math.max(...chain.map(j=>cat.jobs[j]?.bonus?.int||0));assert.equal(e.score({stats:{st_int:1}},'chronomagus',cat.world),Math.round((1+intWeight*10)*10)/10,'gear valuation follows current loaded class bonuses');
+ const gate=require('../src/runtime/release-policy').gate,file=path.join(root,'logs/system-audit/fleet-soak.json'),start=release.deployedAt+1;
+ fs.writeFileSync(file,JSON.stringify({status:'completed',longTermVerified:true,build,startedAt:start,finishedAt:start+2*3600000}));assert.equal(gate(root,build,'trials',start+2*3600000).allowed,false,'two hours cannot satisfy current three-hour release');
+ fs.writeFileSync(file,JSON.stringify({status:'completed',longTermVerified:true,build,startedAt:start,finishedAt:start+3*3600000}));assert.equal(gate(root,build,'trials',start+3*3600000).allowed,true);assert(!gate(root,build,'trials',start+2*3600000).allowed,'future completion cannot pass');assert(!gate(root,build,'cards',start+3*3600000).allowed);
+ const bad=structuredClone(evidence);bad.rows.find(r=>r.suite==='legendary-goal').testSha256='wrong';release=buildRelease(root,build,bad);assert.equal(release.features['paid-actions'].fixturePassed,false,'changed test file cannot claim a pass');
+ v=version.inspect(root,build,{knowledge:{...state,checkedAt:Date.now()-700000},loadedSystemRevision:inventory.revision});assert(!v.aligned&&!v.dataCurrent);
+ v=version.inspect(root,build,{knowledge:{...state,liveBuild:'other'},loadedSystemRevision:inventory.revision});assert(!v.aligned&&!v.sourceMatches);
+ fs.appendFileSync(path.join(root,'src/public/fleet-layout.js'),'\n// changed fixture\n');v=version.inspect(root,build,{knowledge:state,loadedSystemRevision:inventory.revision});assert(v.architectureCurrent&&v.aligned,'web-only edits cannot invalidate a loaded farm');fs.appendFileSync(path.join(root,'src/runtime/ai-command.js'),'\n// changed guard fixture\n');v=version.inspect(root,build,{knowledge:state,loadedSystemRevision:inventory.revision});assert(!v.architectureCurrent&&!v.aligned);assert(v.reasons.some(r=>r.includes('running system code')));
+ const context={fmt:n=>String(n),esc:s=>String(s??'').replace(/[<>&]/g,'?'),table:(heads,rows)=>JSON.stringify([heads,rows])};vm.createContext(context);vm.runInContext(fs.readFileSync('src/public/fleet-layout.js','utf8'),context);assert(context.systemVersionLayout({...v,build:'<script>'},{fresh:true}).includes('?script?'));assert(!context.systemVersionLayout({...v,aligned:true},{fresh:false}).includes('class="good"'));
+ console.log('PASS 18-domain version alignment, current native class valuation, complete source inventory, genuine-evidence schema/test hashes, no fabricated probes, code/game/stale mismatch, three-hour actual acceptance and escaped UI');
+}
+main().finally(()=>fs.rmSync(root,{recursive:true,force:true})).catch(e=>{console.error(e);process.exitCode=1});

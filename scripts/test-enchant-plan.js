@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('assert/strict'),{plan}=require('../src/enchant-plan');
+const items={w:{name:'Test weapon',tier:4}},base={equip:{weapon:'w'},lv:80,job:'nightfang',coins:50000,runeDust:1122,tokens:0,keyItems:{'Ancient Rune':3},weaponOpts:{w:[{k:'matk',s:3,v:18},null,{k:'crit',s:3,v:.06}]}};
+let p=plan(base,items);assert.deepEqual(p.locks,[false,false,true]);assert.equal(p.ready,false);assert.equal(p.cost.tokens,2);assert.equal(p.cost.dust,90);assert.equal(p.cost.coins,1600);
+p=plan({...base,tokens:2},items);assert(p.ready);assert(!p.rune);
+p=plan({...base,job:'starweaver',tokens:3},items);assert.deepEqual(p.locks,[true,false,true]);assert.equal(p.cost.dust,120);
+p=plan({...base,tokens:99,weaponOpts:{w:[{k:'atk',s:3,v:18},{k:'crit',s:4,v:.04},{k:'crit',s:3,v:.06}]}},items);assert(p.ready);assert.deepEqual(p.locks,[false,true,true]);
+p=plan({...base,tokens:99,weaponOpts:{w:[{k:'atk',s:5,v:30},{k:'crit',s:5,v:.05},{k:'crit',s:5,v:.1}]}},items);assert(!p.ready);assert(p.locks.every(Boolean));
+p=plan({...base,tokens:99,coins:9000},items);assert(!p.ready);
+p=plan({...base,tokens:99,weaponOpts:{w:[null,null,null]},keyItems:{'Ancient Rune':4}},items);assert(p.rune);assert(p.ready);
+p=plan({...base,tokens:99,weaponOpts:{w:[null,null,null]},keyItems:{'Ancient Rune':4}},items,null,{crafting:{recipes:[{cost:{'Ancient Rune':5}}]}});assert(!p.rune);
+p=plan({...base,weaponOpts:{w:[{k:'unknown',s:5,v:999},null,null]}},items);assert(!p.ready);
+p=plan({...base,enchPity:99},items);assert.equal(p.chance3,.25);
+console.log('PASS image example, role locks, token shortage, exact lock costs, all locked, reserve budget, rune crafting reserve, unknown stats, pity cap');

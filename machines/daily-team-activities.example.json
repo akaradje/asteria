@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "enabled": true,
+  "requiredMembers": 6,
+  "activities": [
+    "guild",
+    "tower"
+  ],
+  "towerTargetFloor": 100,
+  "priority": "native_eligible_cohort_then_resume_personal_progression",
+  "authorization": "User re-enabled automatic guild/dungeon PvE in V3.2 request 2026-10-08; newer operator pause remains authoritative",
+  "minimumReadyMembers": 3,
+  "authorizationAt": 1791399840000
+}

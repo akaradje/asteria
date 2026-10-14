@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+node scripts/public-safety-check.js
+command -v gitleaks >/dev/null 2>&1 || { echo "Gitleaks is required before publishing." >&2; exit 1; }
+gitleaks git . --redact=100 --no-banner --log-opts=--all

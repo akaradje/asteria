@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('assert/strict'),e=require('../src/economy'),p=require('../src/planning/rare-pet'),scheduler=require('../src/planning/boss-window');
+const cat=e.loadCatalog(process.cwd(),'f3dc944'),now=Date.now();
+const m={id:'rare_fixture',name:'Rare dragon',kind:'miniboss',level:50,race:'มังกร',element:'ไฟ'};
+cat.world={...cat.world,MONSTERS:[m]};
+const wiki={maps:{maps:[{id:'w1',kind:'field',levelMin:40,monsters:{miniboss:[m.id]},connectsTo:{}}]}};
+const i={root:process.cwd(),catalog:()=>cat,lastSave:{lv:120,job:'asura',equip:{},pets:{},bestiary:{[m.id]:5},potions:20},lastSaveAt:now,livePos:{at:now,room:'w1'},vitals:{at:now,hp:1},brain:{blocked:()=>({})}};
+const board={_receivedAt:now,list:[{id:m.id,map:'w1',up:true,next:0}]};
+let r=p.assess(i,wiki,board,now);assert.equal(r.candidate.monsterId,m.id);assert.equal(r.wishlist[0].remainingKills,25);assert.equal(r.wishlist[0].friendship,null);assert.deepEqual(i.lastSave.pets,{});
+for(const change of [{vitals:{at:now,hp:.9}},{vitals:{at:now}},{lastSaveAt:now-30001},{teamControl:{}},{survivalRecovery:true},{brain:{blocked:()=>({w1:true})}},{lastSave:{...i.lastSave,lv:55}},{lastSave:{...i.lastSave,potions:19}},{lastSave:{...i.lastSave,bestiary:{}}},{lastSave:{...i.lastSave,pets:{[m.id]:0}}},{lastSave:{...i.lastSave,bestiary:{[m.id]:30}}}])assert.equal(p.assess({...i,...change},wiki,board,now).candidate,null,JSON.stringify(change));
+assert.equal(p.assess(i,wiki,{...board,_receivedAt:now-31000},now).candidate,null);assert.equal(p.assess(i,wiki,{...board,list:[{...board.list[0],up:false}]},now).candidate,null);
+m.kind='boss';assert.equal(p.assess(i,wiki,board,now).wishlist[0].unlockKills,50);m.kind='miniboss';
+const main={kind:'main-quest',mapId:'w1',monsterId:'quest',score:1800,reason:'quest'};
+assert.equal(scheduler.schedule({hunt:{sources:[],boardFresh:false},save:i.lastSave,wiki,room:'w1',now,extraCandidates:[r.candidate,main]}).goal.monsterId,'quest');
+const primary={monsterKind:'boss',alive:true,mapId:'w1',monsterId:'primary'};assert.equal(scheduler.schedule({hunt:{sources:[primary],boardFresh:true},save:i.lastSave,wiki,room:'w1',now,extraCandidates:[r.candidate]}).goal.monsterId,'primary');
+const future={...primary,alive:false,nextAt:now+60000};assert.notEqual(scheduler.schedule({hunt:{sources:[future],boardFresh:true},save:i.lastSave,wiki,room:'w1',now,extraCandidates:[r.candidate]}).goal.kind,'pet-unlock');
+console.log('PASS elite wishlist, exact unlock counts, no fake ownership, proven kill/safety/fresh spawn guards, main quest and primary boss precedence/deadline');
+(async()=>{const runtime=require('../src/runtime/capped-campaign'),goal={...r.candidate,sideWork:true},j={...i,campaignGoal:goal,canDo:()=>false,socialLast:async()=>board};assert(await runtime.routeExpired({...j,lastSave:{...i.lastSave,pets:{[m.id]:0}}}),'unlock completion retires hunt');assert(await runtime.routeExpired({...j,socialLast:async()=>({...board,_receivedAt:Date.now()-60000})}),'stale board retires hunt');const due={...j,bossWindow:{phase:'side-work',boss:primary,departAt:Date.now()+60000},socialLast:async()=>({...board,list:[...board.list,{id:'primary',map:'w1',up:true,next:0}]})};assert(await runtime.routeExpired(due),'rare hunt cannot hide primary boss preemption');console.log('PASS rare route completion, stale spawn and primary boss preemption');})().catch(e=>{console.error(e);process.exitCode=1});

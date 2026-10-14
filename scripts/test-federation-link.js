@@ -1,0 +1,9 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path'),{Federation}=require('../src/federation'),transport=require('../src/runtime/fleet-transport');
+(async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-link-')),original=transport.sshCapture;try{
+ fs.mkdirSync(path.join(root,'machines'));fs.copyFileSync('machines/fleet.json',path.join(root,'machines/fleet.json'));let now=Date.now(),callbacks=[],calls=0;
+ transport.sshCapture=(args,options,cb)=>{calls++;callbacks.push(cb);};const f=new Federation(root,'windows',{now:()=>now});f.local={machine:'windows',at:now,members:[]};const first=f.exchange();now+=6000;f.local.at=now;await f.exchange();assert.equal(calls,1,'no overlapping SSH process');callbacks.shift()(null,JSON.stringify({machine:'tum',at:now,members:[]}));await first;await new Promise(r=>setImmediate(r));assert.equal(calls,2,'coalesce missed publication immediately after slow success');
+ callbacks.shift()(null,JSON.stringify({machine:'tum',at:now,members:[]}));await new Promise(r=>setImmediate(r));assert.equal(f.linkHealth.status,'connected');assert.equal(f.linkHealth.consecutiveFailures,0);
+ const failure=f.exchange();await f.exchange();callbacks.shift()(Object.assign(Error('fixture'),{code:'SSH_TIMEOUT'}));await failure;await new Promise(r=>setImmediate(r));assert.equal(calls,3,'failure does not spin automatic retries');assert.equal(f.linkHealth.consecutiveFailures,1);assert(f.lastError.includes('SSH_TIMEOUT'));assert.equal(JSON.parse(fs.readFileSync(path.join(root,'logs/fleet/link-health.json'))).totalFailures,1);
+ now+=16000;assert.equal(f.remote(),null,'freshness threshold remains unchanged');console.log('PASS coalesced latest telemetry, one SSH in flight, diagnostic persistence, bounded failure retries and stale rejection');
+}finally{transport.sshCapture=original;fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

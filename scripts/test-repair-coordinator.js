@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+const {RepairCoordinator}=require('../src/learning/repair-coordinator'),pipeline=require('../src/learning/repair-pipeline');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-repair-flow-')),file='src/planning/dependency-time.js',test='scripts/test-brain-dependency-time.js';
+const sha=x=>crypto.createHash('sha256').update(x).digest('hex');
+(async()=>{try{
+ fs.mkdirSync(path.join(root,'src/planning'),{recursive:true});fs.mkdirSync(path.join(root,'scripts'));fs.writeFileSync(path.join(root,file),'module.exports={x:1};');fs.writeFileSync(path.join(root,test),'immutable fixture');
+ const packet=pipeline.packet(root,{id:'observed-defect',build:'b',sourceRevision:'a'.repeat(64),file,reproduction:{fixtureHash:sha('immutable fixture'),observed:'FAIL'}});
+ let clock=10000,deploys=0,loaded=false,obs={},rollback=false;
+ const adapters={reproduce:async()=>({baselineFailed:true}),propose:async()=>({file,beforeHash:packet.beforeHash,content:'module.exports={x:2};',reason:'Restore fixture'}),test:async()=>({baselineFailedAndCandidatePassed:true,fullRegressionPassed:true,testsUnchanged:true}),ready:async()=>({allowed:true}),deploy:async()=>{if(!loaded){deploys++;loaded=true;}return {loaded};},observe:async()=>obs,rollback:async()=>{rollback=true;return {verified:true,operationalStatePreserved:true};}};
+ let c=new RepairCoordinator(root,adapters,{now:()=>clock});const j=c.enqueue(packet);assert.equal(c.enqueue(packet).id,j.id);assert.equal(c.data.jobs.length,1);
+ for(let n=0;n<4;n++)await c.tick();assert.equal(c.data.jobs[0].stage,'DEPLOYING');assert.equal(deploys,0,'persist intent before mutation');
+ c=new RepairCoordinator(root,adapters,{now:()=>clock});await c.tick();assert.equal(c.data.jobs[0].stage,'OBSERVING');assert.equal(deploys,1,'resume persisted intent');
+ obs={terminalVerified:true,identityMatches:true,noRegression:true,measuredMs:59999};await c.tick();assert.equal(c.data.jobs[0].stage,'OBSERVING');clock+=20000;
+ obs={terminalVerified:true,identityMatches:true,noRegression:true,measuredMs:61000,evidence:'native-exact-target-receipt'};await c.tick();assert.equal(c.data.jobs[0].stage,'COMPLETE');assert.equal(c.data.jobs[0].result.combatBenefitVerified,false);
+ const p2={...packet,sourceRevision:'b'.repeat(64)};c.enqueue(p2);loaded=false;for(let n=0;n<5;n++)await c.tick();obs={rollback:true,reason:'native_regression'};await c.tick();assert.equal(c.data.jobs[1].stage,'ROLLING_BACK');await c.tick();assert(rollback);assert.equal(c.data.jobs[1].stage,'ROLLED_BACK');
+ const p3={...packet,sourceRevision:'c'.repeat(64)};c.enqueue(p3);adapters.test=async()=>({baselineFailedAndCandidatePassed:true,fullRegressionPassed:false,testsUnchanged:true});for(let n=0;n<3;n++)await c.tick();assert.equal(c.data.jobs[2].stage,'REJECTED');assert.equal(deploys,2,'failed full suite cannot deploy');
+ const p4={...packet,sourceRevision:'d'.repeat(64)};c.enqueue(p4);adapters.reproduce=async()=>({unavailable:true});await c.tick();assert.equal(c.data.jobs[3].stage,'QUEUED');assert(c.data.jobs[3].nextAt>clock);
+ assert(!JSON.stringify(c.view()).includes('module.exports'),'public status excludes patch source');
+ console.log('PASS durable AI repair transitions, crash recovery, dedup, immutable gates, actual observation requirement, rollback and unavailable runner');
+}finally{if(!fs.realpathSync(root).startsWith(fs.realpathSync(os.tmpdir())+path.sep))throw Error('Wrong temp root');fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

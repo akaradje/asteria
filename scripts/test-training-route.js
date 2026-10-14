@@ -1,0 +1,26 @@
+'use strict';
+const assert=require('assert/strict'),route=require('../src/planning/training-route');
+let now=1000000;
+const save={lv:110,job:'asura',exp:0,potions:40,equip:{weapon:'w'},consumables:{'Sapphire Potion':20},autoOpt:{ph:true}};
+const native=[{id:'slow',kind:'normal',level:91,hp:34608,atk:1621},{id:'new',kind:'normal',level:102,hp:45896,atk:1763}];
+const actor=()=>({lastSave:{...save},lastSaveAt:now,goal:null,livePos:{room:'w1',at:now},catalog:()=>({build:'b1',world:{MONSTERS:native}}),vitals:{at:now,hp:1},lastFps:23,lastFpsAt:now,v2:{sourceCoherence:{matches:true},journal:{pending:()=>false}}});
+const g=(id,map,score,rate=null,travelMs=0)=>({kind:'exp',monsterKind:'normal',monsterId:id,mapId:map,kills:10,score,planningScore:score,travelMs,farmEvidence:rate===null?null:{at:now,samples:12,minutes:10,expPerHour:rate,deaths:0,confidence:'observational'}});
+const cycle=(g,rate)=>({...g,routeEvidence:{at:now,samples:30,ms:600000,coveragePct:100,expPerHour:rate,deaths:0,confidence:'observational'}});
+const refresh=i=>{i.lastSaveAt=now;i.livePos.at=now;i.vitals.at=now;i.lastFpsAt=now;};
+const slow=g('slow','w1',1000,100),fast=g('fast','w2',10,1000),unknown=g('unknown','w3',5000);
+let i=actor();i.goal=slow;let v=route.choose(i,[unknown,slow,fast],now);assert.equal(v.goal.monsterId,'fast');assert(!v.status.causalVerified);
+v=route.choose(i,[slow,{...fast,travelMs:9999999}],now);assert.equal(v.goal.monsterId,'slow','travel repayment');
+assert.equal(route.choose(actor(),[{...fast,farmEvidence:{...fast.farmEvidence,at:now+1}},slow],now).goal.monsterId,'slow','future evidence excluded');
+i=actor();i.goal=unknown;i.livePos.room='w3';assert.equal(route.choose(i,[fast,unknown],now).goal.monsterId,'unknown','minimum dwell');
+i=actor();i.goal=slow;route.choose(i,[slow,unknown],now);now+=600001;refresh(i);slow.farmEvidence.at=now;assert.equal(route.choose(i,[slow,unknown],now).status.trial,null,'field-only baseline cannot approve exploration');
+let baseline=cycle(slow,100),candidate={...unknown,mapId:'w1',travelMs:0};i=actor();i.goal=baseline;route.choose(i,[baseline,candidate],now);now+=600001;refresh(i);baseline.routeEvidence.at=now;v=route.choose(i,[baseline,candidate],now);assert.equal(v.goal.monsterId,'unknown');assert(v.status.trial);assert.equal(i.v2.trial, i.trainingGovernor,'one governor is shared by runtime and selector');
+i.goal=candidate;now+=480000;refresh(i);i.v2.expRouteEvidence={window:()=>({confidence:'observational',knownMs:480000,fieldMs:480000,netExp:30,deaths:0,expLossEvents:0})};v=route.choose(i,[baseline,candidate],now);assert.equal(v.goal.monsterId,'slow','A/B advantage must return for A confirmation');assert(v.status.trial);
+i.goal=baseline;now+=300000;refresh(i);i.v2.expRouteEvidence.window=()=>({confidence:'observational',knownMs:300000,fieldMs:300000,netExp:8.3333,deaths:0,expLossEvents:0});v=route.choose(i,[baseline,candidate],now);assert(v.status.lastResult.accepted);assert.equal(v.goal.monsterId,'unknown');
+assert.equal(route.choose(actor(),[],now).goal,null);
+i=actor();i.goal=cycle(slow,200);v=route.choose(i,[cycle(slow,200),cycle({...fast,travelMs:0},100)],now);assert.equal(v.goal.monsterId,'slow','whole cycle defeats high field-only rate');
+const novel=g('new','c1',2500);novel.kills=0;novel.travelMs=310000;i=actor();assert(route.novelAllowed(i,novel,slow,now));
+for(const patch of [{lastFps:19},{lastFpsAt:now-10001},{vitals:{at:now,hp:.94}},{lastSave:{...save,potions:29}},{lastSave:{...save,consumables:{}}},{lastSave:{...save,autoOpt:{ph:false}}},{lastSaveAt:now-30001},{v2:{sourceCoherence:{matches:false}}},{v2:{sourceCoherence:{matches:true},journal:{pending:()=>true}}}])assert(!route.novelAllowed(Object.assign(actor(),patch),novel,slow,now));
+for(const m of [{...native[1],atk:3000},{...native[1],hp:90000},{...native[1],level:108},{...native[1],kind:'boss'}]){i=actor();i.catalog=()=>({build:'b1',world:{MONSTERS:[native[0],m]}});assert(!route.novelAllowed(i,novel,slow,now));}
+i=actor();baseline=cycle(slow,100);i.goal=baseline;route.choose(i,[baseline,novel],now);now+=600001;refresh(i);baseline.routeEvidence.at=now;v=route.choose(i,[baseline,novel],now);assert(!v.status.trial,'long native travel cannot exceed initial bootstrap');assert(v.status.trialDenied?.includes('budget'));i.v2.trial.data.observedMs=40000000;v=route.choose(i,[baseline,novel],now);assert(v.status.trial?.novel,'measured exploration budget can fund longer safe route');
+i.goal=novel;now+=1000;refresh(i);i.vitals.hp=.59;v=route.choose(i,[baseline,novel],now);assert.equal(v.goal.monsterId,'slow');assert.equal(v.status.lastResult.accepted,false);
+console.log('PASS V3 selector field/whole-time selection, travel repayment, future data, minimum dwell, one-owner A/B/A acceptance, native reconnaissance safety, bootstrap/regular budgets and early rollback');

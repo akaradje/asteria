@@ -1,0 +1,25 @@
+'use strict';
+const assert=require('assert'),inventory=require('../src/runtime/wing-inventory'),survival=require('../src/runtime/survival'),economy=require('../src/economy');
+(async()=>{
+ const world={MAX_LV:120,bagCap:()=>2},items={junk:{id:'junk',name:'junk',slot:'head'},wing:{id:'wing',name:'wing',slot:'wing'}};
+ const i={lastSave:{bag:['junk','wing'],locks:[],equip:{},refine:{}},catalog:()=>({world,items}),expeditionAuto:async()=>{},planBag:async()=>({sell:[{id:'junk'},{id:'wing'}]}),sellItems:async wants=>{assert.deepEqual(wants,[{id:'junk'}]);i.lastSave.bag=['wing'];return {sold:1};},closeGamePanel:async()=>{},bagUpgrade:async()=>{throw Error('must not buy when sale frees room');}};
+ assert((await inventory.prepare(i)).ok);assert.equal(inventory.space(i).free,1);
+ i.lastSave.bag=['junk'];i.planBag=()=>{throw Error('one free slot is enough');};assert((await inventory.prepare(i)).ok);
+ const now=Date.now(),wiki={maps:{maps:[{id:'c1',kind:'field',levelMin:100,levelMax:105},{id:'n1',connectsTo:{next:'n2'}},{id:'n2',connectsTo:{next:'n3'}},{id:'n3',kind:'field',name:'safe',levelMin:74,levelMax:80,monsters:{normal:['wyvern']}},{id:'d3',kind:'field',levelMin:82,levelMax:90}]},monsters:{monsters:[{id:'wyvern',kind:'normal',level:77}]}};
+ const actor={lastSave:{lv:102,bestiary:{wyvern:1}},catalog:()=>({world}),brain:{data:{deaths:{c1:[now-1000]}},blocked:()=>({})}};
+ assert.equal(survival.goal(actor,wiki,now).goal.mapId,'n3');assert.equal(survival.goal(actor,wiki,now).goal.monsterId,'wyvern');
+ actor.brain.data.deaths={c1:[now-1800001]};assert.equal(survival.goal(actor,wiki,now),null);
+ actor.lastSave.lv=120;actor.brain.data.deaths={c1:[now]};assert.equal(survival.goal(actor,wiki,now).goal.mapId,'n3','level cap must retain safe recovery; never choose field without a known normal target');
+ assert.equal(survival.hpPots({potions:0,consumables:{'White Potion':20}}),20);
+ const cat=economy.loadCatalog(process.cwd(),economy.newestBuild(process.cwd()));
+ const gear=Object.values(cat.items).find(x=>x.slot==='weapon'&&x.rarity==='common');
+ const plan=economy.planBag({bag:[gear.id,'windfeather_wing'],equip:{},job:'novice',lv:1,world:cat.world,items:cat.items,save:{locks:[gear.id]}});assert.equal(plan.sell.length,0);assert.equal(plan.store.length,0);
+ const ranger={job:'phantomsniper',lv:120,equip:{},locks:[]};assert.equal(economy.planBag({bag:['windfeather_wing'],equip:{},job:ranger.job,lv:ranger.lv,world:cat.world,items:cat.items,save:ranger}).equip[0].id,'windfeather_wing');
+ const fs=require('fs'),path=require('path'),os=require('os'),{ResultLedger}=require('../src/result-ledger');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-historical-ledger-'));fs.mkdirSync(path.join(root,'logs'));
+ fs.writeFileSync(path.join(root,'logs/development-0.json'),JSON.stringify({rows:[{kind:'refine',at:now-86400000,status:'pending'}]}));
+ const ledger=new ResultLedger(root,0,now);assert.equal(ledger.rows[0].status,'unresolved');assert.equal(ledger.begin('refine',{},{}),null);
+ const craft=ledger.begin('craft',{id:'windfeather_wing'},{bag:[],equip:{},materials:{}},now);assert(craft);assert.equal(ledger.begin('craft',{},{}),null);
+ ledger.observe({bag:['windfeather_wing'],equip:{},materials:{}},now+1);assert.equal(craft.status,'change_observed');assert.equal(ledger.rows[1].status,'unresolved');
+ console.log('PASS: one-slot craft, protected wing/locked gear, confirmed cleanup, death-aware normal farming and HP supplies');
+})().catch(e=>{console.error(e);process.exitCode=1;});

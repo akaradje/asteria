@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "revision": 1,
+  "coordinatorHost": "tum",
+  "leader": "ExampleTankA",
+  "hosts": {
+    "windows": {
+      "id": "windows",
+      "enabled": true,
+      "adapter": "legacy_verified_controller",
+      "platform": "windows",
+      "intermittent": true,
+      "maxActive": 3,
+      "admissionFloorMb": 750
+    },
+    "tum": {
+      "id": "tum",
+      "enabled": true,
+      "adapter": "legacy_verified_controller",
+      "platform": "linux",
+      "serviceId": "asteria-panel.service",
+      "maxActive": 3,
+      "admissionFloorMb": 750
+    },
+    "vps": {
+      "id": "vps",
+      "enabled": true,
+      "adapter": "legacy_verified_controller",
+      "platform": "linux",
+      "serviceId": "asteria-panel.service",
+      "maxActive": 3,
+      "admissionFloorMb": 750
+    }
+  },
+  "members": [
+    {
+      "machine": "tum",
+      "slot": 0,
+      "charName": "ExampleTankA",
+      "baseJob": "knight",
+      "enabled": true
+    },
+    {
+      "machine": "tum",
+      "slot": 1,
+      "charName": "ExampleHealA",
+      "baseJob": "priest",
+      "enabled": true
+    },
+    {
+      "machine": "tum",
+      "slot": 2,
+      "charName": "ExampleArcherA",
+      "baseJob": "ranger",
+      "enabled": true
+    },
+    {
+      "machine": "windows",
+      "slot": 0,
+      "charName": "ExampleRogue",
+      "baseJob": "assassin",
+      "enabled": true
+    },
+    {
+      "machine": "windows",
+      "slot": 1,
+      "charName": "ExampleMage",
+      "baseJob": "mage",
+      "enabled": true
+    },
+    {
+      "machine": "windows",
+      "slot": 2,
+      "charName": "ExampleMonk",
+      "baseJob": "monk",
+      "enabled": true
+    },
+    {
+      "machine": "vps",
+      "slot": 0,
+      "charName": "ExampleTankB",
+      "baseJob": "knight",
+      "enabled": true
+    },
+    {
+      "machine": "vps",
+      "slot": 1,
+      "charName": "ExampleHealB",
+      "baseJob": "priest",
+      "enabled": true
+    },
+    {
+      "machine": "vps",
+      "slot": 2,
+      "charName": "ExampleArcherB",
+      "baseJob": "ranger",
+      "enabled": true
+    },
+    {
+      "machine": "vps",
+      "slot": 3,
+      "charName": "ExampleRogueB",
+      "baseJob": "assassin",
+      "enabled": false,
+      "pauseReason": "พัก ExampleRogueB, ExampleMageB, ExampleMonkB เพื่อลดภาระ CPU; เก็บแทงก์ ฮีล และธนูไว้ วัดผลก่อนเพิ่มจอ"
+    },
+    {
+      "machine": "vps",
+      "slot": 4,
+      "charName": "ExampleMageB",
+      "baseJob": "mage",
+      "enabled": false,
+      "pauseReason": "พัก ExampleRogueB, ExampleMageB, ExampleMonkB เพื่อลดภาระ CPU; เก็บแทงก์ ฮีล และธนูไว้ วัดผลก่อนเพิ่มจอ"
+    },
+    {
+      "machine": "vps",
+      "slot": 5,
+      "charName": "ExampleMonkB",
+      "baseJob": "monk",
+      "enabled": false,
+      "pauseReason": "พัก ExampleRogueB, ExampleMageB, ExampleMonkB เพื่อลดภาระ CPU; เก็บแทงก์ ฮีล และธนูไว้ วัดผลก่อนเพิ่มจอ"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),path=require('path'),os=require('os'),vm=require('vm');
+const {GameInstance}=require('../src/instance'),{FleetActivity}=require('../src/planning/fleet-activity');
+(async()=>{const now=Date.now(),sent=[];let state={_receivedAt:now,left:3,starts:[1,11],run:null},flushes=0;
+ const net={isConnected:()=>true,handlers:{resave(){}},flush:async()=>{flushes++;},social:(t,data)=>sent.push(JSON.parse(JSON.stringify({t,data})))};
+ const actor={lastSaveAt:now,livePos:{room:'town',at:now},socialLast:async()=>state,eval:script=>vm.runInNewContext(script,{window:{AsteriaNet:net},Date})};
+ assert.equal((await GameInstance.prototype.towerStart.call(actor,21)).sent,false);assert.equal(sent.length,0);
+ assert.equal((await GameInstance.prototype.towerStart.call(actor,11)).sent,true);assert.deepEqual(sent[0],{t:'twstart',data:{from:11}});
+ state={_receivedAt:now,left:3,run:{id:123,member:false}};assert.equal((await GameInstance.prototype.towerJoin.call(actor,124)).sent,false);
+ assert.equal((await GameInstance.prototype.towerJoin.call(actor,123,Date.now()+60000)).sent,true);assert.deepEqual(sent[1],{t:'twjoin',data:{id:123}});assert.equal(flushes,2);
+ state._receivedAt=now-45001;assert.equal((await GameInstance.prototype.towerJoin.call(actor,123)).sent,false);assert.equal(sent.length,2);
+ actor.lastSave={lv:15};state={_receivedAt:Date.now(),left:1,minLv:15,open:false,run:null};assert.equal((await GameInstance.prototype.dungeonStart.call(actor)).sent,false);
+ state.open=true;assert.equal((await GameInstance.prototype.dungeonStart.call(actor)).sent,true);assert.deepEqual(sent.at(-1),{t:'dgstart',data:{}},'native Rift opens with empty payload and flush');
+ state.run={id:999,member:false};assert.equal((await GameInstance.prototype.dungeonJoin.call(actor,998)).sent,false);assert.equal((await GameInstance.prototype.dungeonJoin.call(actor,999,Date.now()+60000)).sent,true);assert.deepEqual(sent.at(-1),{t:'dgjoin',data:{id:999}});
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-dispatch-'));try{
+  const config={leader:'Leader',members:[{machine:'windows',slot:0,charName:'Leader'}]},a=new FleetActivity(root,config,'windows');let calls=0,result={ok:false,sent:false};
+  const i={slot:0,status:'playing',credentials:{charName:'Leader'},v2:{scheduler:{run:async(k,fn)=>fn()}},towerStart:async()=>{calls++;return result;}};
+  const intent={id:'test',leader:'Leader',build:'b',kind:'tower',from:1,phase:'OPENING',at:Date.now(),deadline:Date.now()+60000};
+  await a.act(i,intent,'b');await a.act(i,intent,'b');assert.equal(calls,2,'proven no-send can retry');
+  result={ok:true,sent:true};await a.act(i,intent,'b');assert.equal(calls,2,'two proven pre-dispatch failures exhaust this opening');
+  const reloaded=new FleetActivity(root,config,'windows');await reloaded.act(i,intent,'b');assert.equal(calls,2,'no-send budget survives worker recreation');
+  const next={...intent,id:'verified-new-workflow'};await a.act(i,next,'b');await a.act(i,next,'b');assert.equal(calls,3,'sent opening is never replayed');
+  i.towerStart=async()=>{throw Error('unknown outcome');};const unknown={...intent,id:'unknown'};await assert.rejects(a.act(i,unknown,'b'),/unknown outcome/);assert(a.handled.has('unknown:OPENING:0'),'unknown dispatch remains durable');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+ const {ActionScheduler}=require('../src/runtime/action-scheduler'),scheduler=new ActionScheduler();let release;const held=new Promise(r=>release=r),order=[];
+ const optional=scheduler.run('tick',async()=>{await held;scheduler.yieldOptionalNavigation();order.push('optional');});
+ const team=scheduler.run('fleet-GATHERING',async()=>{order.push('team');},{priority:2});release();await assert.rejects(optional,/yielded/);await team;assert.deepEqual(order,['team'],'waiting team receives navigation at safe yield point');
+ const paidScheduler=new ActionScheduler();let finishPaid;const paidWait=new Promise(r=>finishPaid=r);const paid=paidScheduler.run('purchase',async()=>{await paidWait;paidScheduler.yieldOptionalNavigation();return 'confirmed';});const queued=paidScheduler.run('fleet-GATHERING',async()=>true,{priority:2});finishPaid();assert.equal(await paid,'confirmed','paid action is not preempted');await queued;
+ console.log('PASS verified tower payload/flush, stale or wrong eligibility refused, no-send retry and sent/unknown no replay');
+})().catch(e=>{console.error(e);process.exitCode=1;});

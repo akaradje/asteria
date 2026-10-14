@@ -1,0 +1,32 @@
+'use strict';
+const assert=require('assert'),fs=require('fs'),os=require('os'),path=require('path');
+const {assess}=require('../src/public/adaptive-model'),{project,Store}=require('../src/public/adaptive-data');
+const now=2000000;
+const row={id:'a',context:'ctx',at:now,netExp:100,ms:600000,knownMs:600000,samples:20,deaths:0,expLossEvents:0,safe:true,pending:false,coherent:true};
+assert.equal(assess([row,{...row,id:'b',netExp:130,ms:900000,knownMs:900000}],'ctx',now).suggestion,'a');
+for(const patch of [{context:null},{at:now+1},{at:now-60001},{safe:null},{pending:true},{coherent:false},{knownMs:1},{knownMs:900000},{deaths:1},{expLossEvents:1},{netExp:NaN},{ms:0},{samples:2}])assert.equal(assess([{...row,...patch}],'ctx',now).ranked[0].eligible,false,JSON.stringify(patch));
+assert.equal(assess([row],'ctx',now).suggestion,null);
+assert.equal(assess([],'ctx',now).suggestion,null);
+assert.equal(require('../src/public/adaptive-model').simulate,undefined);
+const member={key:'windows:0',machine:'windows',charName:'Test',online:true,detailsFresh:true,details:{lv:100,lastSaveAt:now,fps:24,fpsAt:now,credentials:{password:'DO_NOT_EXPORT'},runtimeV2:{sourceCoherence:{at:now,matches:true,loadedBuild:'b1',liveBuild:'b1'},purchases:[{id:'tx1',at:now,status:'UNCERTAIN',target:{item:'Potion'},password:'DO_NOT_EXPORT'}]},levelProgress:{lv:100,build:'b1',trainingRoute:{at:now,build:'b1-context',selected:'c1:mob',reason:'test',routeEvidence:{at:now,route:'c1:mob',ms:600000,knownMs:600000,netExp:100,samples:20,confidence:'observational',fieldPct:80,coveragePct:100}}}}};
+const before=JSON.stringify(member),p=project(member,now);
+assert.equal(p.rate,600);assert.equal(p.pending,true);assert.equal(p.shadow.suggestion,null);assert(!JSON.stringify(p).includes('DO_NOT_EXPORT'));assert.equal(JSON.stringify(member),before);
+assert.equal(project(member,now+60001).rate,null);
+const copy=()=>JSON.parse(before);
+let changed=copy();changed.details.levelProgress.trainingRoute.routeEvidence.route='wrong';assert.equal(project(changed,now).fresh,false);
+changed=copy();changed.details.runtimeV2.sourceCoherence.liveBuild='b2';assert.equal(project(changed,now).rate,null);
+changed=copy();changed.details.levelProgress.lv=99;assert.equal(project(changed,now).fresh,false);
+changed=copy();changed.online=false;assert.equal(project(changed,now).fps,null);
+changed=copy();delete changed.details.runtimeV2.sourceCoherence;delete changed.details.runtimeV2.purchases;
+const remote=project(changed,now);assert.equal(remote.rate,600);assert.equal(remote.sourceVerified,false);assert.equal(remote.pending,null);assert.equal(remote.shadow.suggestion,null);assert(remote.shadow.ranked[0].reasons.includes('ธุรกรรมยังไม่ชัดเจน'));
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-adaptive-test-'));
+try{
+ const file=path.join(temp,'history.json'),store=new Store(file);
+ let v=store.observe([member],now);assert.equal(v.members[0].points.length,1);assert.equal(v.members[0].events.length,1);
+ v=store.observe([member],now+1000);assert.equal(v.members[0].points.length,1);assert.equal(v.members[0].events.length,1);
+ v=store.observe([member],now+60001);assert.equal(v.members[0].points.length,2);assert.equal(v.members[0].points[1].rate,null);
+ v=store.observe([member],now+65000);assert.equal(v.members[0].points.length,2);
+ const reloaded=new Store(file);assert.equal(reloaded.rows['windows:0'].events.length,1);assert(!fs.readFileSync(file,'utf8').includes('DO_NOT_EXPORT'));
+ changed=copy();changed.charName='NewCharacter';v=store.observe([changed],now+70000);assert.equal(v.members[0].events.length,0);
+}finally{for(const f of fs.readdirSync(temp))fs.unlinkSync(path.join(temp,f));fs.rmdirSync(temp);}
+console.log('PASS: duration-aware shadow, unsafe/unknown/stale guards, simulation removed, projection privacy, deduplication, gaps, persistence and character reset');

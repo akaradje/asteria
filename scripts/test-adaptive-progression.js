@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict'),e=require('../src/economy'),goal=require('../src/equipment-goal'),roi=require('../src/planning/combat-roi'),native=require('../src/knowledge/refine-capability'),root=process.cwd();
+const cat=e.loadCatalog(root,'add136aa');assert.equal(native.nativeRules(cat.world).max,15);assert.equal(goal.target(cat),15);
+const id='twilight_reapers',save={lv:120,job:'eclipsereaper',coins:10000000,equip:{weapon:id},bag:[{id}],refine:{[id]:10},materials:{Starmetal:1000,'Starforged Ore':100},consumables:{[cat.world.STONES.guard.name]:20},stage:{},holes:{},sockets:{},weaponOpts:{}};
+const step=native.step(save,cat,id);assert.equal(step.to,11);assert(step.guard&&!step.destructive);assert(roi.refinement(save,cat,step).eligible);
+assert(e.refinePlan({...save,items:cat.items,world:cat.world,state:save}).doable.some(r=>r.to===11),'Native positive-EV owned guardian unlocks +11');
+const future={...cat,world:{...cat.world,REFINE:{...cat.world.REFINE,max:18,chance:[...cat.world.REFINE.chance,2,2,1]}}};assert.equal(goal.target(future),18);
+const unprotected=native.step({...save,bag:[],consumables:{}},cat,id);assert(!roi.refinement({...save,bag:[],consumables:{}},cat,unprotected).eligible,'No spare on destruction cannot be approved');
+const end={...save,refine:{[id]:15}};assert.equal(native.step(end,cat,id),null);assert(!native.nativeRules({...cat.world,REFINE:{...cat.world.REFINE,chance:[]}}));
+const ranked=roi.rank([{kind:'craft',expectedCombatGain:10,expectedDurationMs:100000},{kind:'astral',expectedCombatGain:5,expectedDurationMs:1000},{kind:'pet',expectedCombatGain:8,expectedDurationMs:100},{kind:'owned',ownsOperation:true}]);assert.deepEqual(ranked.map(r=>r.kind),['owned','pet','astral','craft']);assert(ranked[1].combatROI.estimated&&!ranked[1].combatROI.benefitMeasured);
+const modules=require('../src/learning/repair-pipeline').scopes;for(const f of ['src/planning/astral-path.js','src/knowledge/refine-capability.js','src/equipment-goal.js','src/runtime/capacity-recovery.js'])assert(modules[f]);assert(!modules['src/runtime/durable-store.js']&&!modules['src/result-ledger.js']);
+const scope=require('../src/learning/repair-scope'),before="const x=require('./x');function plan(n){if(n.actorOwner)return false;return n.value*2;}module.exports={plan};";
+assert(scope.validate(before,before.replace('value*2','value*3'),'src/planning/example.js'));assert.throws(()=>scope.validate(before,before.replace('if(n.actorOwner)return false;',''),'src/planning/example.js'));assert.throws(()=>scope.validate(before,before.replace("'./x'","'child_process'"),'src/planning/example.js'));
+const semantic=require('../src/runtime/semantic-release').inspect(root,'add136aa');assert(semantic.autoApproved);assert(semantic.contracts.astral.allowed);assert.equal(semantic.hashPinRequired,false);
+const rows=require('../src/knowledge/development-source').source(root,'add136aa',cat).recipes;assert(rows.some(r=>r.out.item==='empyrean_slippers'));assert(rows.some(r=>r.out.item===id&&r.cost['Leviathan Heart']===1));
+console.log('PASS native15/future18, guarded high EV/spare/cap/schema, cross-path ROI, broad repair/authority fences, semantic Astral and all init recipe variants');
+
+const text=require('fs').readFileSync('cache/add136aa/asteria-online.io/asteria-online-visual-polish.html','utf8'),metadata=require('../src/knowledge/native-item-metadata');
+const futureItem={id:'native_future_item',name:'Future native item',slot:'weapon',tier:8,reqLv:130,stats:{atk:500}};
+const changed=text.replace("item.uniqueBoss || item.tier >= 6 ? 'legendary'","item.tier >= 8 ? 'mythic' : item.uniqueBoss || item.tier >= 6 ? 'legendary'");
+assert.equal(metadata.read(changed,{EQUIPMENT:[futureItem]},{}).native_future_item.rarity,'mythic','new native classification is data, not a manually pinned hash');
+assert.throws(()=>metadata.read(changed.replace('const old = ITEMS[item.id];',"const old = ITEMS[item.id]; require('fs');"),{EQUIPMENT:[futureItem]},{}));
+console.log('PASS structural native metadata accepts new tier/rarity and rejects filesystem execution');

@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),e=require('../src/economy'),sup=require('../src/runtime/refine-supplies'),cat=e.loadCatalog(process.cwd(),'add136aa'),now=Date.now(),actor='actor-'+'a'.repeat(32),id='twilight_reapers';
+const s={lv:120,job:'eclipsereaper',coins:10000000,equip:{weapon:id},refine:{[id]:10},materials:{Starmetal:100,'Starforged Ore':20},consumables:{},bag:[],storage:{gear:[]},locks:[]};
+const i={root:process.cwd(),lastSave:s,catalog:()=>cat,actorIdentity:{actorId:actor},v2:{reservations:{totals:()=>({})}},registryV32:{store:{held:()=>({})}}};
+let p=sup.opportunity(i);assert.equal(p.kind,'guardian');assert.equal(p.price,cat.world.STONES.guard.coin);assert.equal(p.group,'consumables');assert(!/premium/.test(p.selector));
+i.lastSave={...s,consumables:{'Guardian Stone':1},materials:{Starmetal:100}};p=sup.opportunity(i);assert.equal(p.kind,'star');assert.equal(p.price,cat.world.STAR_BUY.coin);assert.equal(p.selector,'[data-star-buy="coin"]');
+assert.equal(sup.opportunity({...i,lastSave:{...s,coins:1000}}),null);assert.equal(sup.opportunity({...i,lastSave:{...s,refine:{[id]:15}}}),null);
+p={kind:'guardian',group:'consumables',name:'Guardian Stone',price:150000};const row={actorId:actor,generation:2,sentAt:now-100,target:{supply:p,before:s,context:{sessionStartedAt:now-10000,build:cat.build,rev:20}}};
+const after={state:{...s,coins:s.coins-p.price,consumables:{'Guardian Stone':1}},proof:{actorId:actor,authority:'server_readback',generation:2,sessionStartedAt:now-10000,build:cat.build,requestAt:now-50,at:now,rev:21}};
+assert(sup.receipt(row,after,i));for(const x of [{coins:s.coins},{consumables:{'Guardian Stone':2}},{materials:{Starmetal:99}},{refine:{[id]:11}}])assert(!sup.receipt(row,{...after,state:{...after.state,...x}},i));
+for(const x of [{generation:3},{actorId:'wrong'},{requestAt:now-200},{build:'wrong'},{rev:20}])assert(!sup.receipt(row,{...after,proof:{...after.proof,...x}},i));
+console.log('PASS native Copper/quotas/owned guardian/star bills, exact single supply receipt, foreign/stale/quantity/payment negatives');

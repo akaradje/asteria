@@ -1,0 +1,117 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
+require('./test-ai-recovery-fallback');
+const {AutoBrain,eligible}=require('../src/auto-brain');
+(async()=>{
+const now=Date.now(),root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-auto-'));fs.mkdirSync(path.join(root,'logs'));
+const writeStatus=(overrides={})=>fs.writeFileSync(path.join(root,'logs/status.json'),JSON.stringify({at:new Date().toISOString(),instances:[{slot:0,status:'playing',lv:20,exp:100,job:'mage',lastSaveAgo:2,noProgressFor:180,...overrides}]}));writeStatus();
+const c={id:'test',slot:0,action:'review_route',expiresAt:now+60000};
+const i={status:'playing',lastSaveAt:now,progressAt:now-180000};
+assert.equal(eligible(c,i,now),null);
+assert(eligible({...c,action:'sell'},i,now));
+assert(eligible(c,{...i,endgameCampaign:{phase:'wing',ready:true}},now));assert(eligible(c,{...i,vitals:{hp:.1}},now));assert.equal(eligible(c,{...i,progressAt:now,v3:{controller:{view:()=>({quietMs:180000})}}},now),null,'controller goal progress outranks incidental activity clock');assert(eligible({...c,expiresAt:now-1},i,now));
+assert(eligible(c,{...i,lastSaveAt:now-31000},now));assert(eligible(c,{...i,progressAt:now-1000},now));assert(eligible(c,{...i,aiControl:{id:'test'}},now));assert(eligible(c,{...i,pendingTravel:{}},now));
+assert(eligible(c,{...i,lastSaveAt:now+6000},now));
+let calls=0,dispatches=0;const advisor={busy:false,nextAt:0,last:null,async generate(){calls++;this.last={at:new Date().toISOString(),snapshotAt:new Date().toISOString(),providers:{openrouter:{ok:true},typesafe:{ok:true,choices:[{slot:0,action:'review_route',confidence:.9}]}},plan:{members:[{slot:0,action:'review_route',reason:'stuck'}]}};}};
+const a=new AutoBrain(root,advisor,()=>({id:1,ready:true}),async()=>{dispatches++;return{status:'queued'}});
+await a.tick(now);assert.equal(calls,1);assert.equal(dispatches,1);await a.tick(now);assert.equal(calls,1);
+a.setEnabled(false);await a.tick(now+999999);assert.equal(calls,1);assert.equal(new AutoBrain(root,advisor,()=>({ready:true}),async()=>{}).data.enabled,false);
+a.setEnabled(true);a.data.nextAt=0;const gen=advisor.generate.bind(advisor);advisor.generate=async()=>{await gen();advisor.last.providers.typesafe.choices[0].confidence=.2;};await a.tick(Date.now());assert.equal(dispatches,1);
+a.data.nextAt=0;advisor.generate=async()=>{throw Error('private error')};await a.tick(Date.now());assert.equal(a.data.failures,1);assert(!a.busy);assert(a.data.nextAt>Date.now()+590000);
+a.data.nextAt=0;advisor.generate=async()=>{await gen();a.setEnabled(false);};a.data.enabled=true;await a.tick(Date.now());assert.equal(dispatches,1);
+a.data.enabled=true;a.data.nextAt=0;
+advisor.generate=async()=>{await gen();advisor.last.plannerProvider='meta';advisor.last.providers.meta={ok:true};delete advisor.last.providers.openrouter;};
+await a.tick(Date.now());assert.equal(dispatches,2);assert.equal(a.data.history[0].plannerProvider,'meta');
+a.data.nextAt=0;advisor.generate=async()=>{await gen();advisor.last.plannerProvider='meta';advisor.last.providers.meta={ok:false};};
+await a.tick(Date.now());assert.equal(dispatches,2);assert.equal(a.data.failures,1);
+a.data.nextAt=0;advisor.generate=async()=>{await gen();advisor.last.plannerProvider='meta';advisor.last.providers.meta={ok:true};advisor.last.providers.typesafe.choices[0].confidence=.2;};
+await a.tick(Date.now());assert.equal(dispatches,2);
+const previousCalls=calls;writeStatus({noProgressFor:10});a.data.nextAt=0;await a.tick(Date.now());assert.equal(calls,previousCalls);assert.equal(a.data.skippedRounds,1);
+writeStatus({lastSaveAgo:31});a.data.nextAt=0;await a.tick(Date.now());assert.equal(calls,previousCalls);
+writeStatus({choresBusy:true});a.data.nextAt=0;await a.tick(Date.now());assert.equal(calls,previousCalls);
+writeStatus();a.data.nextAt=0;advisor.generate=async()=>{await gen();writeStatus({noProgressFor:0});};await a.tick(Date.now());assert.equal(dispatches,2);assert.match(a.data.history[0].decisions[0].status,/ข้อมูลเปลี่ยน/);
+// Outcomes are evaluated even during productive/no-API ticks, never across builds/farms.
+a.data.history=[{at:new Date(now-240000).toISOString(),farmId:1,baseline:[{slot:0,build:'fixture',level:20,exp:100,job:'mage'}],decisions:[{slot:0}]}];
+writeStatus({noProgressFor:0,exp:250,levelProgress:{build:'fixture'}});a.data.nextAt=0;await a.tick(Date.now());assert.equal(a.data.history[0].outcomes[0].netExp,150);assert.match(a.data.history[0].outcomes[0].evidence,/not_proof/);
+a.data.history=[{at:new Date(now-240000).toISOString(),farmId:2,baseline:[{slot:0,build:'fixture',level:20,exp:100,job:'mage'}],decisions:[{slot:0}]}];a.data.nextAt=0;await a.tick(Date.now());assert.equal(a.data.history[0].outcomes[0].netExp,undefined);
+// A new blocked incident wakes a scheduled AI round, but never API backoff.
+writeStatus({identity:{actorId:'actor-A'},runtimeV3:{controller:{quietMs:400000,recovery:{version:1,incidentKey:'incident-A',needsDiagnosis:true,reason:'space blocked',blockedNodes:['space']}}}});
+a.data.enabled=true;a.data.nextAt=Date.now()+300000;a.data.failures=0;a.data.lastRequestedAt=Date.now()-61000;
+advisor.generate=gen;const beforeWake=calls;await a.tick(Date.now());assert.equal(calls,beforeWake+1);assert.equal(a.data.diagnoses[0].actorId,'actor-A');assert.equal(a.data.diagnoses[0].resolved,false);
+a.data.nextAt=Date.now()+300000;a.data.lastRequestedAt=Date.now()-61000;await a.tick(Date.now());assert.equal(calls,beforeWake+1,'same incident does not repeatedly wake');
+a.data.diagnoses=[];a.data.failures=1;await a.tick(Date.now());assert.equal(calls,beforeWake+1,'new incident cannot bypass provider backoff');
+// Reusing a slot never attributes another actor outcome to this advice.
+a.data.history=[{at:new Date(now-240000).toISOString(),farmId:1,baseline:[{slot:0,actorId:'old',build:'fixture',level:20,exp:100,job:'mage'}],decisions:[{slot:0}]}];
+a.evaluate({members:[{slot:0,actorId:'new',build:'fixture',level:20,exp:500,job:'mage',status:'playing',saveAgeSeconds:1}]},{id:1},Date.now());assert.equal(a.data.history[0].outcomes[0].netExp,undefined);
+// Class changes are progression, while combat samples are not comparable across jobs.
+a.data.history=[{at:new Date(now-240000).toISOString(),farmId:1,baseline:[{slot:0,actorId:'same',build:'b',job:'monk',level:120,exp:0}],decisions:[{slot:0}]}];
+a.evaluate({members:[{slot:0,actorId:'same',build:'b',job:'asura',level:120,exp:0,status:'playing',saveAgeSeconds:1}]},{id:1},Date.now());
+assert.equal(a.data.history[0].outcomes[0].effects[0].kind,'class');assert.equal(a.data.history[0].outcomes[0].combatComparable,false);assert.equal(a.data.history[0].outcomes[0].causalVerified,false);
+// A valid bounded strategy does not need model consensus; recheck it after inference.
+const actorId='actor-'+'a'.repeat(32);
+const native={identity:{actorId},levelProgress:{build:'b'},personalBrain:{availableFocuses:['focus_craft']},noProgressFor:300};
+writeStatus(native);a.data.incidents=[];a.data.enabled=true;a.data.nextAt=0;
+advisor.generate=async()=>{const state=require('../src/ai-advisor').context(root),member=state.members[0],snapshotAt=new Date().toISOString();advisor.last={at:snapshotAt,snapshotAt,plannerProvider:'meta',providers:{meta:{ok:true,model:'fixture'},typesafe:{ok:true,choices:[{slot:0,action:'continue',confidence:.2}]}},plan:{members:[{slot:0,action:'focus_craft',reason:'finish verified upgrade',proposal:require('../src/learning/proposal-contract').verify({},member,{snapshotAt})}]}};};
+let prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior+1);assert.equal(a.data.history[0].decisions[0].route,'bounded_planner');
+writeStatus({...native,runtimeV3:{controller:{quietMs:300000,recovery:{needsDiagnosis:true,incidentKey:'old-payment',blockedNodes:['execute','space'],reason:'old result'}}}});
+a.data.incidents=[{actorId,build:'b',resolved:false,playbook:{maxAttempts:1,verifyMs:60000},attempts:[{at:Date.now()-70000,result:'ACCEPTED_NOT_CONFIRMED'}]}];a.data.nextAt=0;
+prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior+1,'inventory recovery budget must not prohibit strategy intent');
+const emitted=a.data.history[0].decisions[0];assert(emitted.commandId);
+a.data.history[0].at=new Date(now-240000).toISOString();
+a.evaluate({members:[{...require('../src/ai-advisor').context(root).members[0],lastAIAction:{id:emitted.commandId,state:'applied',evidence:'native_controller_strategy_applied_not_upgrade',at:now,status:'focus set'}}]},{id:1},now);
+assert.equal(a.data.history[0].outcomes[0].execution.state,'applied');assert.equal(a.data.history[0].outcomes[0].causalVerified,false);
+writeStatus(native);a.data.incidents=[];
+const boundedGenerate=advisor.generate;a.data.nextAt=0;
+advisor.generate=async()=>{await boundedGenerate();writeStatus({...native,choresBusy:true});};prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior+1,'owner changed during inference permits only a deferred zero-spend focus');
+const accept=require('../src/runtime/ai-command').accept;const planned={...c,action:'focus_craft'};for(const owner of [{choresBusy:true},{pendingTravel:{}},{teamControl:true},{livePos:{room:'gd#123'}}]){assert.equal(accept(planned,{...i,...owner},now),null);assert(eligible(planned,{...i,...owner},now),'native execution still requires owner release');assert(accept(c,{...i,...owner},now),'route action cannot enter deferred queue');}assert(accept({...planned,expiresAt:now-1},i,now));assert(accept(planned,{...i,v2:{sourceCoherence:{matches:false}}},now));assert(accept(planned,{...i,vitals:{hp:.1}},now));
+const scope=require('../src/runtime/storage-payment-scope'),independent=scope.independent;try{
+ scope.independent=()=>true;assert.equal(eligible({...c,action:'focus_craft'},{...i,v2:{journal:{pending:()=>true}}},now),null);
+ assert(eligible({...c,action:'recover'},{...i,v2:{journal:{pending:()=>true}}},now));
+ scope.independent=()=>false;assert.equal(eligible({...c,action:'focus_craft'},{...i,v2:{journal:{pending:()=>true}}},now),null,'intent does not settle or replay payment');
+ assert(eligible(c,{...i,v2:{journal:{pending:()=>true}}},now),'route action still requires native scope');
+}finally{scope.independent=independent;}
+// Productive actors get periodic strategic control, not only incident advice.
+writeStatus({...native,noProgressFor:2});a.data.authorityReviews={};a.data.nextAt=0;advisor.generate=boundedGenerate;
+prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior+1,'AI controls focus without a stall or judge consensus');
+assert.equal(a.view().authority.role,'strategic_controller');assert.equal(a.data.history[0].authority,'strategic_controller');
+assert.deepEqual(a.data.history[0].routineSlots,[0]);assert.equal(a.data.authorityReviews[actorId+':b'].action,'focus_craft');
+a.data.nextAt=0;prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior,'accepted priority is not resubmitted every tick');
+const strategy={action:'focus_craft',until:Date.now()+60000,proposal:{actorId,build:'b'}};
+const {strategicSlots,context:readContext}=require('../src/ai-advisor');
+writeStatus({...native,noProgressFor:2,personalBrain:{...native.personalBrain,strategy}});
+assert.deepEqual(strategicSlots(readContext(root)),[],'active AI plan retains control');
+writeStatus({...native,noProgressFor:2,aiControl:{state:'deferred',expiresAt:Date.now()+60000}});
+assert.deepEqual(strategicSlots(readContext(root)),[],'pending owner-held intent is preserved');
+writeStatus({...native,noProgressFor:2,lastSaveAgo:31});assert.deepEqual(strategicSlots(readContext(root)),[]);
+writeStatus({...native,noProgressFor:2,endgameCampaign:{phase:'wing',ready:true}});assert.deepEqual(strategicSlots(readContext(root)),[]);
+writeStatus({...native,noProgressFor:2});a.data.authorityReviews={};a.data.nextAt=0;
+advisor.generate=async()=>{await boundedGenerate();writeStatus({...native,noProgressFor:2,identity:{actorId:'actor-'+'b'.repeat(32)}});};
+prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior,'actor replacement during inference cannot inherit control');
+writeStatus({...native,noProgressFor:2});a.data.nextAt=0;advisor.generate=async()=>{await boundedGenerate();advisor.last.plan.members[0].action='continue';};
+await a.tick(Date.now());assert.equal(a.data.authorityReviews[actorId+':b'].action,'continue','continue is an explicit AI delegation');
+const policy=require('../src/learning/autonomous-policy'),member=readContext(root).members[0];
+assert(!policy.allowed('recover',member,require('../src/learning/proposal-contract').verify({},member,{snapshotAt:new Date().toISOString()})),'routine control does not grant unnecessary corrective recovery');
+writeStatus({...native,noProgressFor:2});a.data.authorityReviews={};a.data.nextAt=0;advisor.nextAt=0;
+advisor.generate=async()=>{await boundedGenerate();advisor.last.providers.meta={ok:false,error:'timeout'};advisor.last.providers.typesafe={ok:true,model:'jev-latest',choices:[{slot:0,action:'focus_craft',confidence:.95}]};advisor.last.plan=null;};
+prior=dispatches;await a.tick(Date.now());assert.equal(dispatches,prior+1,'available fallback AI may dispatch a bounded strategy during primary outage');assert.equal(a.data.history[0].plannerProvider,'typesafe');assert.equal(a.data.history[0].fallback.mode,'bounded_zero_spend_strategy');assert.equal(a.data.history[0].decisions[0].proposal.maxSpend,0);
+// A temporary stale actor cannot consume its checkpoint or suppress teammates.
+const learning=new AutoBrain(root,advisor,()=>({id:10,ready:true}),async()=>{throw Error('evaluation never dispatches');});
+learning.data.outcomeMemory=[];
+const t=Date.now(),base=t-240000;
+const actors=['actor-'+'1'.repeat(32),'actor-'+'2'.repeat(32)];
+learning.data.history=[{at:new Date(base).toISOString(),farmId:10,baseline:actors.map((actorId,slot)=>({slot,actorId,build:'current',job:'mage',level:120,exp:10,busy:false,goalMap:'e1',equipment:[{slot:'weapon',id:'staff',refine:7}]})),decisions:actors.map((actorId,slot)=>({slot,actorId,commandId:'learning-'+slot,action:'focus_refine',chain:'accepted_not_confirmed'}))}];
+const fresh=actors.map((actorId,slot)=>({slot,actorId,build:'current',job:'mage',level:120,exp:20,status:'playing',saveAgeSeconds:2,currentGoal:{mapId:'e1'},development:{equipment:[{slot:'weapon',id:'staff',refine:7}]},lastAIAction:{id:'learning-'+slot,state:slot?'deferred':'applied',at:base+10000}}));
+learning.evaluate({members:[fresh[0],{...fresh[1],saveAgeSeconds:31}]},{id:10},t);
+assert.equal(learning.data.history[0].outcomeChecks[0].checkpoint,180000);assert.equal(learning.data.history[0].outcomeChecks[1],undefined);assert.equal(learning.data.outcomeMemory.length,1);
+learning.evaluate({members:fresh},{id:10},t+1000);assert.equal(learning.data.outcomeMemory.length,2);assert.equal(learning.data.history[0].outcomes[1].planAssessment,'awaiting_application');assert.equal(learning.data.history[0].outcomes[1].appliedForMs,null);
+learning.evaluate({members:fresh},{id:10},t+2000);assert.equal(learning.data.outcomeMemory.length,2,'same checkpoint is not duplicated');
+learning.evaluate({members:fresh},{id:11},base+600000);assert.equal(learning.data.outcomeMemory.length,2,'a new farm cannot inherit the observation window');
+learning.evaluate({members:[{...fresh[0],actorId:actors[1]},fresh[1]]},{id:10},base+600000);assert.equal(learning.data.outcomeMemory.length,3,'foreign actor cannot earn this slot observation');
+const upgraded={...fresh[0],busy:true,development:{equipment:[{slot:'weapon',id:'staff',refine:8}]}};
+learning.evaluate({members:[upgraded,fresh[1]]},{id:10},base+601000);
+assert.equal(learning.data.outcomeMemory.length,4);assert.equal(learning.data.history[0].outcomes[0].effects[0].kind,'refine');assert.equal(learning.data.history[0].outcomes[0].planAssessment,'observed_progress');assert(learning.data.history[0].outcomes[0].confounders.includes('protected_work'));assert.equal(learning.data.history[0].outcomes[0].causalVerified,false);
+learning.evaluate({members:[upgraded,fresh[1]]},{id:10},base+900000);assert.equal(learning.data.outcomeMemory.length,6);learning.save();
+const recovered=new AutoBrain(root,advisor,()=>({id:10,ready:true}),async()=>{});assert.equal(recovered.data.outcomeMemory.length,6,'local memory survives AI reload');
+learning.evaluate({members:fresh},{id:10},base+1800001);assert.equal(learning.data.outcomeMemory.length,6,'expired window stops observing');
+console.log('PASS autonomous strategic control during productive play, review pacing, active-plan/owner preservation, identity recheck, pause/backoff and native outcome evaluation');
+})().catch(e=>{console.error(e);process.exitCode=1});

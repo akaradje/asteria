@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path'),economy=require('../src/economy'),plans=require('../src/class-build');
+const root=process.cwd(),build=economy.newestBuild(root),cat=economy.loadCatalog(root,build),i={root,catalog:()=>cat};
+for(const [id,definition]of Object.entries(cat.world.HIGH_CLASSES)){
+ const tables=plans.load(i),own=tables[id];assert(own,'loaded High Class '+id);assert(own.skills.length>tables[definition.from].skills.length,'inherits third class and adds skills');
+ assert(plans.skillPlan(i,id,{preferHotbar:true}).length);assert.equal(plans.statPlan(i,id,57).length,57);assert(plans.statPlan(i,id,57).every(k=>own.bonus[k]>0));
+}
+assert(plans.skillPlan(i,'asura').includes('asura_strike'));assert(plans.skillPlan(i,'chronomagus').includes('chrono_haste'));assert.deepEqual(plans.skillPlan(i,'invented-class'),[]);
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'development-flow-'));try{assert.deepEqual(plans.skillPlan({root:tmp,catalog:()=>cat},'asura'),[],'missing current-build table never falls back to old invented skills');}finally{fs.rmSync(tmp,{recursive:true,force:true});}
+const fakeCat={world:{MAX_LV:120},items:{w:{id:'w',name:'w',slot:'weapon',tier:1,stats:{atk:1}},better:{id:'better',name:'better',slot:'weapon',tier:1,stats:{atk:20}}}},wiki={crafting:{recipes:[{type:'gear',result:'better',resultId:'better',reqLv:1,cost:{Copper:100}}]},monsters:{monsters:[]}},save={lv:120,job:'knight',equip:{weapon:'w'},coins:100000,materials:{'Iron Ore':10}};
+const invest=require('../src/investment-plan');assert.equal(invest.choose(save,fakeCat,wiki).selected,null,'unknown campaign cannot spend');assert.equal(invest.choose(save,fakeCat,wiki,{campaignComplete:true}).selected.kind,'craft','finished class/wing releases gear investments');assert.equal(invest.choose({...save,coins:0},fakeCat,wiki,{campaignComplete:true}).selected,null,'completion does not bypass resources');
+const advisor=require('../src/ai-advisor'),state={members:[{slot:0,status:'playing',saveAgeSeconds:2,noProgressSeconds:0,personalBrain:{availableFocuses:['focus_gear']}}]},plan=action=>({summary:'test',members:[{slot:0,action,reason:'test'}]});
+assert(advisor.validatePlan(plan('focus_gear'),state));assert.throws(()=>advisor.validatePlan(plan('focus_growth'),state));assert.throws(()=>advisor.validatePlan(plan('recover'),state));assert.throws(()=>advisor.validatePlan(plan('focus_gear'),{members:[{...state.members[0],saveAgeSeconds:31}]}));
+const retry=require('../src/runtime/campaign-retry');let r;for(let n=0;n<3;n++)r=retry.failed(r,'wing',{ok:false,sent:false,reason:'new development source requires review'});assert(r.safeSideWork);assert(!retry.failed(null,'wing',{ok:false,sent:true,reason:'new development source requires review'}).safeSideWork);
+console.log('PASS loaded High Class inheritance/stat budgets, missing-source refusal, capped-complete investment unlock/reserves, unavailable/stale AI focus refusal and pre-dispatch-only side work');

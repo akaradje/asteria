@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('assert/strict'),{SocialInbox}=require('../src/runtime/social-inbox');
+const inbox=new SocialInbox();inbox.receive(JSON.stringify({t:'party',id:1,members:[{name:'ExampleAccount2'}]}),100);
+assert.equal(inbox.last('party').id,1);assert.equal(inbox.last('party')._receivedAt,100);
+inbox.receive(JSON.stringify({t:'pinvite',name:'ExampleAccount2',from:1}),110);
+assert.equal(inbox.frames('pinvite',105).length,1);assert.equal(inbox.frames('pinvite',110).length,0);
+inbox.receive('{invalid');inbox.receive(JSON.stringify({t:'login',password:'never retain'}));assert.equal(inbox.last('login'),null);
+for(let n=0;n<120;n++)inbox.receive(JSON.stringify({t:'party',id:1}),120+n);assert.equal(inbox.rows.length,100);
+inbox.receive(JSON.stringify({t:'party',id:null}),300);assert.equal(inbox.last('party').id,null);
+inbox.clear();assert.equal(inbox.last('party'),null);assert.equal(inbox.rows.length,0);
+console.log('PASS early server party capture, invite freshness, bounded whitelist, leave and disconnect reset');

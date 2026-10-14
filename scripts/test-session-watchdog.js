@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('assert/strict'),{SessionWatchdog}=require('../src/runtime/session-watchdog');
+const w=new SessionWatchdog(),base={saveAt:1000,health:{connected:true,paused:false}};
+assert.equal(w.inspect({...base,now:10000}).action,'continue');
+assert.equal(w.inspect({...base,now:200000,health:{paused:true}}).action,'wait');assert.equal(w.checks,0);
+assert.equal(w.inspect({...base,now:200000,protectedRoom:true}).action,'wait');assert.equal(w.checks,0);
+assert.equal(w.inspect({...base,now:200000}).action,'wait');assert.equal(w.inspect({...base,now:200001}).action,'wait');assert.equal(w.checks,1);
+assert.equal(w.inspect({...base,now:220000}).action,'wait');assert.equal(w.inspect({...base,now:240000}).action,'recover');
+assert.equal(w.inspect({...base,saveAt:240001,now:240002}).action,'continue');assert.equal(w.checks,0);
+w.recoveries=[250000,260000,270000];w.checks=2;assert.equal(w.inspect({...base,now:500000}).action,'wait');assert.equal(w.recoveries.length,3);
+console.log('PASS session watchdog: fresh saves, paused trade/dungeon protection, independent checks, new-save reset and recovery budget');

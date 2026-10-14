@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('assert/strict'),vm=require('vm'),{stats,skills}=require('../src/runtime/free-points');
+let draft=0,confirmed=0,left=5;
+const plus={get disabled(){return draft>=left;},click(){draft++;}},body={querySelector(s){if(s.includes('.rs-p'))return plus;if(s==='#stOk')return {disabled:false,click(){confirmed++;left-=draft;draft=0;}};if(s.includes('#stPts'))return {textContent:String(left)};throw Error('unexpected or destructive selector '+s);}};
+const context={document:{getElementById:()=>body},window:{}};vm.createContext(context);
+const result=vm.runInContext('('+stats.toString()+')(["str"])',context);assert.equal(result.raised,5);assert.equal(confirmed,1);assert.equal(left,0);
+let tab='old',old=2,high=0,points=3,saves=0;
+const skillBody={querySelector(s){if(s.includes('[data-skview'))return {click(){tab='old';}};if(s.startsWith('[data-sktab=')){const t=s.match(/="([^"]+)"/)[1];return {click(){tab=t;}};}if(s.includes('.skn-plus')){const id=s.match(/data-sk="([^"]+)"/)[1];if(id==='new_skill'&&tab==='high'&&points>0&&high<3)return {disabled:false,click(){high++;points--;}};if(id==='old_skill'&&tab==='old'&&points>0&&old<2)return {disabled:false,click(){old++;points--;}};return null;}if(s.includes('.skt-pts'))return {textContent:String(points)};throw Error('unexpected or destructive selector '+s);},querySelectorAll(s){assert.equal(s,'[data-sktab]');return [{dataset:{sktab:'old'}},{dataset:{sktab:'high'}}];}};
+context.document.getElementById=()=>skillBody;context.window={AsteriaNet:{handlers:{resave(){saves++;}}}};const learned=vm.runInContext('('+skills.toString()+')(["old_skill","new_skill"])',context);assert.equal(learned.learned,3);assert.equal(high,3);assert.equal(saves,1);assert.equal(learned.left,0);
+console.log('PASS native stat draft confirmation, exhausted point stop, High Class tab traversal, current buttons, bounded skill spending and native resave; no reset or direct state writes');

@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm');
+const source=fs.readFileSync('src/instance.js','utf8'),start=source.indexOf('  async equipItems(wanted) {'),end=source.indexOf('\n  /**',start);
+const method=vm.runInNewContext('(class { '+source.slice(start,end)+' }).prototype.equipItems',{sleep:async()=>{},Date});
+(async()=>{for(const useUid of [true,false]){let clicks=0;const actor={lastSave:{bag:[useUid?{id:'aegis_wing',uid:42}:'aegis_wing'],equip:{}},openGamePanel:async()=>({ok:true}),closeGamePanel:async()=>{}};
+ const tile={dataset:{k:'42'},title:'',querySelector:()=>({dataset:{tipn:'Aegis Wing'}}),click:()=>{clicks++;}},wrong={dataset:{k:'43'},title:'Aegis Wing',querySelector:()=>({dataset:{tipn:'Other'}}),click:()=>{throw Error('wrong copy selected');}};
+ const button={disabled:false,click:()=>{actor.lastSave.equip.wing='aegis_wing';}};
+ const document={querySelector:s=>s.includes('data-act')?button:null,querySelectorAll:s=>s.includes('.tile')?[tile,wrong]:[],getElementById:()=>({hidden:false})};
+ actor.eval=async script=>vm.runInNewContext(script,{document});
+ const r=await method.call(actor,[{name:'Aegis Wing',id:'aegis_wing',slot:'wing'}]);assert.equal(r.equipped,1);assert.equal(clicks,1);assert.equal(r.missed.length,0);
+ }console.log('PASS current mouse UI without title, exact bag UID, icon fallback and actual save confirmation');})().catch(e=>{console.error(e);process.exitCode=1;});

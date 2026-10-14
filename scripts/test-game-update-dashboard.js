@@ -1,0 +1,30 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm');
+const escape=value=>String(value??'–').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ctx={Date,esc:escape,fmt:value=>Number.isFinite(value)?String(value):'–'};vm.createContext(ctx);vm.runInContext(fs.readFileSync('src/public/fleet-layout.js','utf8'),ctx);
+const now=Date.now(),base={liveBuild:'b1',loadedBuild:'b1',checkedAt:now,sourceCoherence:{matches:true,mismatched:[],missing:[]}};
+let html=ctx.gameKnowledgeLayout(null,now);assert(html.includes('ไม่สามารถสรุป'));assert(!html.includes('class="good"'));
+html=ctx.gameKnowledgeLayout({updatePending:false,checkedAt:now},now);assert(html.includes('ยังไม่มีหลักฐานเทียบ'));assert(!html.includes('class="good"'));
+html=ctx.gameKnowledgeLayout(base,now);assert(html.includes('รุ่นและไฟล์ที่ตรวจเทียบกับแคชตรงกัน'));
+html=ctx.gameKnowledgeLayout({...base,updatePending:true,sourceCoherence:{matches:false,mismatched:['world'],missing:[]}},now);assert(html.includes('แม้ชื่อรุ่นเดิม'));assert(html.includes('ไฟล์ที่ต่าง: world'));assert(!html.includes('พบรุ่นเกมใหม่'),'same-build change is not a build-number update');
+html=ctx.gameKnowledgeLayout({...base,liveBuild:'b2',updatePending:true},now);assert(html.includes('ฟาร์มยังโหลดรุ่นต่างกัน'));
+for(const provenance of [{running:false,snapshotAt:now},{running:true,snapshotAt:now-90001}]){
+ html=ctx.gameKnowledgeLayout(base,now,provenance);assert(html.includes('แสดงรายงานเดิม'));assert(!html.includes('class="good"'),'off or stale Windows must not appear current');
+}
+html=ctx.gameKnowledgeLayout({...base,checkedAt:now-600001},now);assert(html.includes('ข้อมูลการตรวจอัปเดตเก่า'));
+const report={baseline:false,coverage:{complete:false,wiki:{domainsCompared:7,totalDomains:8}},wikiDiff:{status:'compared',counts:{added:1,removed:2,changed:3},examples:[{path:'/items/<script>',before:100,after:110}]},sourceChanges:{world:{status:'compared',changed:true,sections:[{name:'<unsafe>',changed:true}]}},patchNotes:{current:{status:'parsed',notes:[{id:'x" onclick="bad',date:'2026-10-03',title:'<script>alert(1)</script>',items:[{t:'Forge',d:'<img src=x>'}]}]}},reviewTasks:[{id:'r1',domain:'items',reason:'verify <img>',checks:['compare <svg>']}],detailsTruncated:true};
+html=ctx.gameKnowledgeLayout({...base,lastError:'<script>offline</script>',wikiError:'wiki <unknown>',updates:report},now);
+assert(html.includes('ตรวจอัปเดตไม่สำเร็จ'));assert(html.includes('ครอบคลุมบางส่วน'));assert(html.includes('รายงานเดิม'));
+for(const raw of ['<script>','<img','<svg>','onclick="bad'])assert(!html.includes(raw),'untrusted report must escape '+raw);
+assert(html.includes('งานตรวจกลไกก่อนนำไปใช้'));assert(html.includes('เพิ่ม 1 · เปลี่ยน 3 · ลบ 2'));assert(html.includes('เทียบ 7 / 8 หมวด'));
+assert(html.includes('แสดงเฉพาะส่วนสรุป'));assert(html.includes('ไม่อนุมัติคำสั่งหรือการจ่ายทรัพยากร'));
+assert.equal((html.match(/data-live-key="(?:wiki|patch|review)-update-details"/g)||[]).length,3,'stable disclosure keys for DOM reconciliation');
+html=ctx.gameKnowledgeLayout({...base,current:{updateReport:{...report,baseline:true,wikiDiff:{status:'baseline',counts:{}},reviewTasks:[],patchNotes:{current:{status:'missing',notes:[]}}}}},now);
+assert(html.includes('ข้อมูลตั้งต้น'));assert(html.includes('ยังอ่านประกาศไม่ได้'));
+const bounded={...report,wikiDiff:{status:'compared',examples:Array.from({length:50},(_,n)=>({path:'item-'+n,before:n,after:n+1}))},reviewTasks:Array.from({length:50},(_,n)=>({id:'review-'+n,domain:'domain-'+n,checks:[]}))};
+html=ctx.gameUpdateReportLayout(bounded,{fresh:true});assert(html.includes('item-11'));assert(!html.includes('item-12'));assert(!html.includes('domain-12'));
+assert(ctx.actorSourceLayout({gameStatus:'playing',runtimeV2:{sourceCoherence:{matches:true,at:now}}},now).includes('ตรงกับหลักฐานล่าสุด'));
+assert(ctx.actorSourceLayout({gameStatus:'unknown',runtimeV2:{sourceCoherence:{matches:true,at:now}}},now).includes('รอข้อมูลสด'));
+assert(ctx.actorSourceLayout({gameStatus:'playing',runtimeV2:{sourceCoherence:{matches:true,at:now-90000}}},now).includes('รอข้อมูลสด'));
+assert(ctx.actorSourceLayout({gameStatus:'playing',runtimeV2:{sourceCoherence:{matches:false,at:now,mismatched:['<script>']}}},now).includes('&lt;script&gt;'));
+console.log('PASS absent/stale/offline versus coherent or same-build changed sources; partial coverage/errors, bounded diffs/review tasks, escaped notes and stable disclosure keys');

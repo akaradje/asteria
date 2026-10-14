@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "build": "84a3b0f8",
+  "at": 1791993489355,
+  "files": [
+    {
+      "url": "https://asteria-online.io/asteria-online-visual-polish.html",
+      "sha256": "5e72e0a8f58906b396e69c83b2aaec2598d0beaffee7f437004cb4b9d7044775"
+    },
+    {
+      "url": "https://asteria-online.io/asteria-world-system.js",
+      "sha256": "4a9bcd8d2ccc45bde23400be7f4b890e168fccd54f0f2d8f8dfeb4a22ff303ea"
+    },
+    {
+      "url": "https://asteria-online.io/asteria-net.js",
+      "sha256": "15eeed34cd745e05ff2b91d610143c0c9d4f0cf87a48a4c9a71736812784c9e1"
+    }
+  ],
+  "dependencies": [
+    {
+      "url": "https://asteria-online.io/asteria-i18n.js",
+      "sha256": "8c3284ab3ba9bba6834438c333666e6c7a296bf06bfadb0c7bde2088f14be111"
+    },
+    {
+      "url": "https://asteria-online.io/asteria-audio.js",
+      "sha256": "ac68496898782cf963bc66fad9daf44db6e581a54e27a055799407c7a7b112dd"
+    },
+    {
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2"
+    },
+    {
+      "url": "https://asteria-online.io/asteria-i18n-dict.js?v=6fce8f6138",
+      "sha256": "ecf8d99799e661afc227970e4d078c7441a61ef24366333f0a570c34fc2d8824"
+    }
+  ]
+}

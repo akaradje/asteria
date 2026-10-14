@@ -1,0 +1,25 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
+const {Federation,validate,safeMember}=require('../src/federation');
+const {ActionScheduler}=require('../src/runtime/action-scheduler');
+(async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-fleet-'));try{
+ const config=JSON.parse(fs.readFileSync(path.join(__dirname,'../machines/fleet.json')));fs.mkdirSync(path.join(root,'machines'));fs.writeFileSync(path.join(root,'machines/fleet.json'),JSON.stringify(config));
+ const instance=new(require('../src/instance').GameInstance)({root,slot:0,credentials:{username:'fixture',storageSlot:2}});assert.equal(instance.storageSlot,2);assert(instance.profileDir.endsWith('slot-02'));assert(instance.brain.file.endsWith('brain-2.json'));assert.throws(()=>validate({...config,members:config.members.slice(0,5)}),/six/);
+ let now=Date.now();const f=new Federation(root,'tum',{now:()=>now}),commands=[];
+ const six=config.members.map((m,i)=>({name:m.charName,aid:i+10}));
+ const live=config.members.filter(m=>m.machine==='tum').map((m,i)=>({slot:i,credentials:{charName:m.charName,password:'SECRET'},lastSave:{job:m.baseJob,lv:50},lastSaveAt:now,status:'playing',teamPartyId:1,v2:{scheduler:new ActionScheduler()},party:six.slice(0,2),async partyState(){return this.party.length?{id:1,leader:10,members:this.party,_receivedAt:now}:null},async partyInvite(name){commands.push(['invite',name])},async partyLeave(){commands.push(['leave',m.charName]);this.party=[]},async socialFrames(){return [{name:'Stranger',from:999},{name:config.leader,from:10}]},async socialSend(t,p){commands.push([t,p.from]);this.party=six}}));
+ f.publish(live,{id:1,leader:config.leader,members:six.map(m=>m.name),checkedAt:now},'build');
+ const remote={machine:'windows',at:now,members:config.members.filter(m=>m.machine==='windows').map(m=>({slot:m.slot,charName:m.charName,status:'playing',job:m.baseJob,lv:60,lastSaveAt:now,teamPartyId:1,livePos:{room:'w1',x:1,z:2,at:now},vitals:{hp:.4,at:now}}))};
+ f.save(path.join(f.dir,'windows.json'),remote);assert.equal(f.view().online,6);assert.equal(f.view().complete,true);assert.equal(f.peers(live).length,6);assert.equal(new Set(f.peers(live).map(i=>i.slot)).size,6);assert(!JSON.stringify(safeMember(live[0])).includes('SECRET'));
+ live[1].party=[];live[2].v2.scheduler.cancel();live[2].party=[{name:'OldLeader',aid:10}];await f.partyRound({instances:live,maybeJoinGuild:async()=>{}});assert(commands.some(c=>c[0]==='invite'&&c[1]===config.members.filter(m=>m.machine==='windows')[1].charName));assert(commands.some(c=>c[0]==='pans'&&c[1]===10));assert(!commands.some(c=>c[1]===999));
+ const oldReceipt=now-120000;for(const i of live)i.partyState=async()=>({id:1,leader:10,members:six,_receivedAt:oldReceipt,_sessionBound:true,_streamAt:now});
+ const farm={instances:live,maybeJoinGuild:async()=>{}};await f.partyRound(farm);
+ assert.equal(farm.partyInfo.checkedAt,now);assert.equal(farm.partyInfo.serverReceivedAt,oldReceipt);
+ f.publish(live,farm.partyInfo,'build');assert.equal(f.view().complete,true,'unchanged server party remains valid when checked on live sessions');
+ now+=16000;assert.equal(f.remote(),null);assert.equal(f.peers(live).length,live.length);assert.equal(f.view().complete,false);
+ const follower=new Federation(root,'windows',{now:()=>now});follower.publish([],null,'build');await follower.partyRound({instances:[],maybeJoinGuild:async()=>{}});
+ const signed={...remote,at:now};f.save(path.join(f.dir,'windows-v32.json'),signed);f.save(path.join(f.dir,'windows.json'),{...remote,at:now+3431});assert.equal(f.remote().at,now,'legacy future clock cannot overwrite calibrated native peer');assert.equal(require('../src/registry/topology').feeds(root,now).find(x=>x.machine==='windows').at,now);f.save(path.join(f.dir,'windows-v32.json'),{...signed,at:now-16000});f.save(path.join(f.dir,'windows.json'),{...remote,at:now});assert.equal(f.remote(),null,'native feed gap must not switch clocks through a legacy fallback');
+ const balanced=JSON.parse(JSON.stringify(config));Object.assign(balanced.members.find(m=>m.baseJob==='monk'),{machine:'windows',slot:2});assert.doesNotThrow(()=>validate(balanced));
+ const invalid=JSON.parse(JSON.stringify(config));invalid.members.find(m=>m.baseJob==='monk').slot=0;assert.throws(()=>validate(invalid),/slots/);
+ console.log('PASS six classes, balanced and capacity fallback assignments, unique peer slots, credential-free telemetry, stale-peer rejection and filtered invitations');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1});

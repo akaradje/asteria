@@ -1,0 +1,28 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'v32-cohort-'));let now=Date.parse('2026-10-13T05:00:00.000Z');
+(async()=>{try{
+ const build=JSON.parse(fs.readFileSync('machines/fleet-client-release.json')).build,dir=path.join(root,'cache',build,'asteria-online.io');fs.mkdirSync(dir,{recursive:true});fs.copyFileSync(path.join('cache',build,'asteria-online.io/asteria-online-visual-polish.html'),path.join(dir,'asteria-online-visual-polish.html'));
+ const config={leader:'C0',members:Array.from({length:6},(_,n)=>({charName:'C'+n,machine:n<3?'tum':'windows',slot:n%3}))},party={id:2,leader:'C0',checkedAt:now,members:['C0','C1','C2']};
+ const sources=[{machine:'tum',at:now,build,party,members:config.members.slice(0,3).map((m,n)=>({...m,identity:{actorId:'a'+n,realm:'r',epoch:'s',policyRevision:1},lv:120,status:'playing',lastSaveAt:now,teamPartyId:2,livePos:{room:'town',at:now},vitals:{hp:1,mp:1,at:now},readiness:{ready:true,at:now},activityState:{tw:{build,at:now,left:3,minLv:15,starts:[1],run:null}}}))}];
+ const chosen=require('../src/planning/activity-cohort').select(root,config,sources,build,'tower',now);assert(chosen.ready);assert.equal(chosen.members.length,3);assert.equal(chosen.leader,'C0');
+ const a=new(require('../src/planning/fleet-activity').FleetActivity)(root,config,'tum',{now:()=>now});assert(a.begin('tower',build,{enabled:true,participants:chosen.members,leader:chosen.leader,cohortRevision:chosen.revision}));
+ for(const m of sources[0].members)m.workflowAck={id:a.state.id,phase:'GATHERING',ok:true,at:now};a.reconcile(sources,party);assert.equal(a.state.phase,'PREPARING');for(const m of sources[0].members)m.workflowAck.phase='PREPARING';a.reconcile(sources,party);assert.equal(a.state.phase,'OPENING');assert.equal(a.state.participants.length,3);
+ const wrong={slot:2,character:{name:'C2'},credentials:{charName:'C2'},actorIdentity:{actorId:'replacement'},teamControl:true};await a.act(wrong,a.view(),build);assert.equal(wrong.teamControl,false,'reused actor slot cannot own old intent');
+ sources[0].members[1].activityState.tw.left=0;assert(!require('../src/planning/activity-cohort').select(root,config,sources,build,'tower',now).ready,'unknown/used quota not blindly entered');
+ sources[0].members[1].activityState.tw.left=3;
+ const dynamic=require('../src/planning/dynamic-daily-activities'),retry=require('../src/planning/activity-retry');
+ const day=new Date(now+7*3600000).toISOString().slice(0,10);
+ const d={root,config,now:()=>now,policy:{activities:['tower'],minimumReadyMembers:3},saved:{runs:[]},file:path.join(root,'logs/fleet/daily-activities.json'),reloadControls:()=>({autoEnabled:true})};
+ a.state={id:'failed-rally',kind:'tower',build,day,phase:'WITHDRAWN',at:now,finishedAt:now,participants:chosen.members,evidence:'no_quota_command_dispatched'};
+ dynamic.reconcile(d,sources,a,build);assert.equal(a.state.phase,'WITHDRAWN','failed dynamic rally must release personal work instead of immediate regroup');assert.equal(d.view.workPolicy.ownsNavigation,false);assert.equal(d.view.retry.tower.failures,1);
+ now+=60000;dynamic.reconcile(d,sources,a,build);assert.equal(a.state.phase,'WITHDRAWN','former 60-second retry no longer loops');assert.equal(d.saved.runs.length,1,'same workflow is accounted once');
+ const persisted=JSON.parse(fs.readFileSync(d.file));d.saved=persisted;
+ now+=240000;for(const m of sources[0].members){m.lastSaveAt=m.livePos.at=m.vitals.at=m.readiness.at=m.activityState.tw.at=now;}sources[0].at=party.checkedAt=now;
+ dynamic.reconcile(d,sources,a,build);assert.equal(a.state.phase,'GATHERING','eligible original activity resumes after bounded personal-work interval');
+ a.state={id:'failed-again',kind:'tower',build,day,phase:'WITHDRAWN',at:now,finishedAt:now,participants:chosen.members};dynamic.reconcile(d,sources,a,build);assert.equal(d.view.retry.tower.delayMs,600000,'durable failures grow retry interval across restored history');
+ const history=[{id:'g',kind:'guild',build,day,at:now,phase:'WITHDRAWN',cleared:false}];assert.equal(retry.retry(history,{kind:'tower',build,day,now}).allowed,true,'unrelated activities are not held');assert.equal(retry.retry(history,{kind:'guild',build,day,now,manual:true}).allowed,true,'explicit fresh rally may bypass only backoff, not native gates');
+ history.push({id:'g-ok',kind:'guild',build,day,at:now+1,phase:'COMPLETE',cleared:true});assert.equal(retry.retry(history,{kind:'guild',build,day,now:now+1}).failures,0,'only same activity confirmed completion resets failure history');
+ assert.equal(retry.retry(history,{kind:'guild',build,day:'2026-10-14',now:now+86400000}).failures,0,'a new native quota day does not inherit the prior day retry count');
+ console.log('PASS native dynamic cohort, durable per-activity exponential retry, personal-work release, manual backoff exception and quota/identity gating');
+}finally{fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

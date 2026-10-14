@@ -1,0 +1,5 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path');
+function record(root,mode,now=Date.now()){if(!['running','operator_stopped'].includes(mode))throw Error('Unknown host operator intent');const file=path.join(root,'logs/host-intent.json');fs.mkdirSync(path.dirname(file),{recursive:true});let previous=null;try{previous=JSON.parse(fs.readFileSync(file));}catch{}const row={version:1,mode,revision:(previous?.revision||0)+1,requestedAt:now,authority:'local_controller'};const r=require('./telemetry-file').writeTelemetry(file,row);if(!r.ok)throw Error('Cannot persist operator intent');return row;}
+function view(root,running,now=Date.now()){let r;try{r=JSON.parse(fs.readFileSync(path.join(root,'logs/host-intent.json')));}catch{return {operatorStopped:false,intentAuthority:null,intentAt:null};}return {operatorStopped:!running&&r.version===1&&r.mode==='operator_stopped',intentAuthority:r.authority==='local_controller'?'local_controller':null,intentAt:now,intentRevision:r.revision,intentRequestedAt:r.requestedAt};}
+module.exports={record,view};

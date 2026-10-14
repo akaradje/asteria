@@ -1,0 +1,48 @@
+'use strict';
+const crypto=require('node:crypto');
+const fresh=(at,ms,now)=>Number.isFinite(at)&&now>=at&&now-at<=ms;
+function begin({roster,sourceRevision,build,hours=3,requiredCapabilities=[],now=Date.now()}={}){
+ if(![3,24].includes(hours)||!Array.isArray(roster)||!roster.length||roster.length>64||roster.some(r=>!/^actor-[a-f0-9]{32}$/.test(r.actorId)||!r.host||!Number.isInteger(r.slot))||new Set(roster.map(r=>r.actorId)).size!==roster.length||!/^[a-f0-9]{64}$/.test(sourceRevision||'')||!build)throw Error('Verified bounded native roster/source/build and 3h or 24h required');
+ return {version:1,runId:crypto.randomUUID(),status:'running',startedAt:now,lastAt:null,targetMs:hours*3600000,hours,sourceRevision,build,requiredCapabilities,roster,actors:{},hosts:{},wallObservedMs:0,eligibleTeamMs:0,completeTeamMs:0,samples:0,gaps:[],epochs:{},longTermVerified:false,limits:'Eligible active time excludes only fresh explicit operator stops. Source/test/copy/load/native outcome are distinct; no causal claim.'};
+}
+function score(r,fleet,now=Date.now()){
+ if(r.status!=='running')throw Error('Recorder is not running');
+ const dt=r.lastAt===null?0:now-r.lastAt,interval=dt>0&&dt<=60000;r.lastAt=now;r.samples++;if(dt<0||dt>60000)r.gaps.push({at:now,ms:dt});if(dt>0)r.wallObservedMs+=dt;
+ const rows=[...(fleet.members||[]),...(fleet.expansion?.members||[])],hosts={...fleet.machines,vps:fleet.expansion?{...fleet.expansion,host:fleet.expansion.host}:fleet.machines?.vps||null};let eligible=0,healthy=0,unknown=0;
+ const epoch={};
+ for(const member of r.roster){const m=rows.find(m=>m.key===member.actorId||m.details?.identity?.actorId===member.actorId),d=m?.details,h=hosts[member.host];
+  const explicitStop=h?.operatorStopped===true&&h.running===false&&fresh(h.intentAt,60000,now)&&h.intentAuthority==='local_controller';
+  const expected=!explicitStop,a=r.actors[member.actorId]||={host:member.host,slot:member.slot,eligibleMs:0,onlineMs:0,pausedMs:0,freshMs:0,fps:[],control:[],recoveryIds:[],outcomes:[],exercised:{},baseline:null,latest:null};
+  const matching=d?.identity?.actorId===member.actorId,feedFresh=fresh(fleet.at,15000,now),online=expected&&feedFresh&&matching&&m.online===true&&m.detailsFresh===true&&fresh(d.lastSaveAt,30000,now),loaded=h?.version?.loadedSystemRevision||h?.loadedFarmRevision||null,build=d?.levelProgress?.build||h?.build||null;
+  epoch[member.actorId]={build,loaded};const aligned=loaded===r.sourceRevision&&build===r.build;
+  if(expected){eligible++;if(online&&aligned)healthy++;if(!matching||!aligned)unknown++;}
+  if(interval&&a.previousExpected&&expected){a.eligibleMs+=dt;if(a.previousHealthy&&online&&aligned)a.onlineMs+=dt;if(a.previousFresh&&online)a.freshMs+=dt;}
+  if(interval&&!expected&&!a.previousExpected)a.pausedMs+=dt;
+  if(online){const sample={at:now,level:d.lv,job:d.job,equip:d.equip||null,wing:d.equip?.wing||null,pet:d.petActive||null,legendary:d.equipmentGoal?.legendaryEquipped??d.equipmentCeiling?.goal?.legendaryEquipped??null,astral:d.astral?.state||null};a.baseline||=sample;a.latest=sample;
+   const consoleMode=d.runtimeV2?.observation?.nativeBotConsole===true;
+   a.consoleSamples=(a.consoleSamples||0)+Number(consoleMode);a.visibleSamples=(a.visibleSamples||0)+Number(!consoleMode);
+   if(!consoleMode&&fresh(d.fpsAt,15000,now)&&Number.isFinite(d.fps)){a.fps.push(d.fps);a.fpsObservedSamples=(a.fpsObservedSamples||0)+1;}
+   const profileFresh=fresh(d.stageProfile?.at,45000,now),evalStage=profileFresh&&Array.isArray(d.stageProfile?.stages)?d.stageProfile.stages.find(x=>x.kind==='eval'):null;const samples=(evalStage?.samples||[]).filter(x=>fresh(x.at,45000,now)&&Number.isFinite(x.wallMs));const latency=samples.length?samples.reduce((n,x)=>n+x.wallMs,0)/samples.length:null;if(Number.isFinite(latency))a.control.push(latency);
+   a.runtime ||= {samples:0,loopP95:[],rss:[]};if(profileFresh&&Number.isFinite(d.stageProfile?.eventLoop?.p95Ms)&&Number.isFinite(d.stageProfile?.rssMb)){a.runtime.samples++;a.runtime.loopP95.push(d.stageProfile.eventLoop.p95Ms);a.runtime.rss.push(d.stageProfile.rssMb);a.runtime.loopP95=a.runtime.loopP95.slice(-4000);a.runtime.rss=a.runtime.rss.slice(-4000);}
+   for(const action of [...(d.runtimeV2?.purchases||[]),...(Array.isArray(d.development)?d.development:d.development?.rows||[])]){const at=action.serverReceipt?.at||action.finishedAt;if(at>=r.startedAt&&action.evidence==='server_accepted_exact_save_revision'&&action.serverReceipt&&action.id&&!a.outcomes.some(x=>x.id===action.id)){a.outcomes.push({id:action.id,kind:action.kind,at,authority:'native_accepted_exact_revision',benefitMeasured:false});a.exercised[action.kind]=(a.exercised[action.kind]||0)+1;}}
+   for(const action of d.capabilityOutcomes||[]){const domain=action.kind?.split(':')[0];if(action.actorId===member.actorId&&action.build===r.build&&action.at>=r.startedAt&&action.at<=now&&action.confirmed===true&&action.revision===d.capabilityCoverage?.[domain]?.revision&&['server_socket','server_readback'].includes(action.authority)&&action.receiptId&&!a.outcomes.some(x=>x.id===action.receiptId)){a.outcomes.push({id:action.receiptId,kind:action.kind,at:action.at,authority:action.authority,benefitMeasured:false});a.exercised[action.kind]=(a.exercised[action.kind]||0)+1;}}
+   for(const recovery of d.recovery||[])if(recovery.id&&recovery.startedAt>=r.startedAt&&!a.recoveryIds.includes(recovery.id))a.recoveryIds.push(recovery.id);
+   a.fps=a.fps.slice(-4000);a.control=a.control.slice(-4000);a.outcomes=a.outcomes.slice(-1000);
+  }
+  a.previousExpected=expected;a.previousHealthy=online&&aligned;a.previousFresh=online;if(expected){a.identityKnown=matching;a.aligned=aligned;}a.intentionalStop=!expected;
+ }
+ const complete=eligible>0&&healthy===eligible&&unknown===0;if(interval&&r.previousEligible&&eligible>0){r.eligibleTeamMs+=dt;if(r.previousComplete&&complete)r.completeTeamMs+=dt;}r.previousEligible=eligible>0;r.previousComplete=complete;
+ for(const [id,h]of Object.entries(hosts)){if(!h)continue;const memory=h.host||h;const row=r.hosts[id]||={samples:0,minFreeMb:null,sourceRevision:null};if(Number.isFinite(memory.freeMb)){row.samples++;row.minFreeMb=row.minFreeMb===null?memory.freeMb:Math.min(row.minFreeMb,memory.freeMb);}row.sourceRevision=h.version?.loadedSystemRevision||h.loadedFarmRevision||null;}
+ const key=JSON.stringify(epoch),e=r.epochs[key]||={firstAt:now,lastAt:now,samples:0};e.lastAt=now;e.samples++;r.completePct=r.eligibleTeamMs?r.completeTeamMs/r.eligibleTeamMs*100:null;r.lastSample={at:now,eligible,healthy,unknown,complete};return r.lastSample;
+}
+function conclude(r,now=Date.now()){
+ r.status='completed';r.finishedAt=now;r.actualWallMs=now-r.startedAt;const actors=Object.values(r.actors),exercise=new Set(actors.flatMap(a=>Object.keys(a.exercised)));
+ r.coverage={required:r.requiredCapabilities,exercised:[...exercise],unexercised:r.requiredCapabilities.filter(x=>!exercise.has(x))};
+ const percentile=(values,p)=>values?.length?[...values].sort((a,b)=>a-b)[Math.floor((values.length-1)*p)]:null;
+ const fpsPassed=a=>a.visibleSamples===0?a.consoleSamples>=10:a.fps.length>=10&&(a.fpsObservedSamples||0)>=a.visibleSamples*.95&&percentile(a.fps,.05)>=15;
+ r.performance={actorChecks:actors.map(a=>({host:a.host,slot:a.slot,runtimeSamples:a.runtime?.samples||0,loopP95Ms:percentile(a.runtime?.loopP95,.95),controlP95Ms:percentile(a.control,.95),rssPeakMb:a.runtime?.rss.length?Math.max(...a.runtime.rss):null,visibleFpsP05:percentile(a.fps,.05),visibleSamples:a.visibleSamples||0,consoleSamples:a.consoleSamples||0,fpsObservationCoverage:a.visibleSamples?(a.fpsObservedSamples||0)/a.visibleSamples:null,fpsPassed:fpsPassed(a)})),scope:'controller-inclusive CPU/IO and RSS are shared; not isolated actor totals; missing visible FPS or stale profile does not pass',passed:actors.every(a=>a.eligibleMs===0&&a.intentionalStop||a.runtime?.samples>=10&&percentile(a.runtime.loopP95,.95)<=1000&&a.control.length>=10&&percentile(a.control,.95)<=5000&&fpsPassed(a))&&[...new Set(actors.filter(a=>a.eligibleMs>0).map(a=>a.host))].every(host=>r.hosts[host]?.samples>=10&&r.hosts[host].minFreeMb>=500)};
+ r.longTermVerified=r.actualWallMs>=r.targetMs&&r.wallObservedMs>=r.targetMs*.95&&r.gaps.length===0&&r.completePct>=99.5&&r.roster.every(member=>r.actors[member.actorId])&&actors.every(a=>a.eligibleMs===0?a.intentionalStop:a.identityKnown&&a.aligned&&a.onlineMs/a.eligibleMs>=.995)&&!r.coverage.unexercised.length&&r.performance.passed;
+ r.verificationReason=r.longTermVerified?'exercised registered scope met measured acceptance':'duration/coverage/identity/loaded revision/continuity acceptance incomplete';return r;
+}
+function changeRoster(r,roster,cohortRevision,now=Date.now()){if(r.status!=='running'||!Number.isSafeInteger(cohortRevision)||cohortRevision<1)throw Error('Explicit current cohort revision required');if(r.cohortRevision===cohortRevision){if(JSON.stringify(r.roster)!==JSON.stringify(roster))throw Error('Cohort revision reused for different actors');return false;}if(r.cohortRevision&&cohortRevision<r.cohortRevision)throw Error('Cohort revision cannot move backwards');begin({roster,sourceRevision:r.sourceRevision,build:r.build,hours:r.hours,now});r.cohortHistory ||= [{revision:r.cohortRevision||0,at:r.startedAt,roster:r.roster.map(x=>({...x}))}];r.cohortHistory.push({revision:cohortRevision,at:now,roster:roster.map(x=>({...x}))});r.cohortRevision=cohortRevision;r.roster=roster.map(x=>({...x}));r.previousEligible=false;r.previousComplete=false;for(const a of Object.values(r.actors)){a.previousExpected=false;a.previousHealthy=false;a.previousFresh=false;}return true;}
+module.exports={begin,score,conclude,changeRoster};

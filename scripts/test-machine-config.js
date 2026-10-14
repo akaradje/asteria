@@ -1,0 +1,18 @@
+'use strict';
+const assert = require('assert/strict');
+const { loadMachineArgs } = require('../src/machine-config');
+const fleet=require('../machines/fleet.json');
+assert.equal(loadMachineArgs(['--machine=windows'], 'win32').n, fleet.members.filter(m=>m.machine==='windows').length);
+assert.equal(loadMachineArgs(['--machine=tum'], 'linux').n, fleet.members.filter(m=>m.machine==='tum').length);
+assert.equal(loadMachineArgs(['--machine=windows'], 'win32').n+loadMachineArgs(['--machine=tum'], 'linux').n,6);
+assert.equal(loadMachineArgs(['--machine=windows', '--n=4'], 'win32').n, '4');
+assert.equal(loadMachineArgs(['--machine=tum'], 'linux').god, undefined);
+assert.equal(loadMachineArgs(['--machine=vps'], 'linux').n, require('../machines/expansion.json').activeCount);
+assert.equal(loadMachineArgs(['--machine=vps'], 'linux').federation, false);
+assert.equal(loadMachineArgs(['--machine=vps'], 'linux')['no-team-activities'], true);
+assert.throws(() => loadMachineArgs(['--machine=vps'], 'win32'), /requires/);
+assert.throws(() => loadMachineArgs(['--machine=windows'], 'linux'), /requires/);
+assert.throws(() => loadMachineArgs(['--machine=tum'], 'win32'), /requires/);
+assert.throws(() => loadMachineArgs(['--machine=unknown'], 'win32'), /Use/);
+assert.deepEqual(loadMachineArgs(['--probe'], 'win32'), { probe: true });
+console.log('machine config: passed');

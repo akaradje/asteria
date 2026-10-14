@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),eco=require('../src/economy'),gear=require('../src/gear-value');
+const build=JSON.parse(fs.readFileSync('machines/fleet-client-release.json')).build,cat=eco.loadCatalog(process.cwd(),build),w=cat.world;
+const graded=w.MONSTERS.find(m=>m.cardGrade);assert(graded,'native graded monster fixture');
+const c=gear.card(graded.id+'@5',w),plain=gear.card(graded.id,w);assert(c);assert.deepEqual(c.stats,w.scaleCard(plain.stats,graded.id+'@5'));
+const t=w.MONSTERS.find(m=>Object.keys(w.cardTrait(m)||{}).length&&gear.card(m.id,w).slot==='weapon');assert(t);
+const weapon=Object.values(cat.items).find(it=>it.slot==='weapon'),cid=t.cardGrade?t.id+'@5':t.id,base=gear.totals({job:'mage',equip:{weapon:weapon.id}},cat);
+const n=100,withCards=gear.totals({job:'mage',equip:{weapon:weapon.id},sockets:{[weapon.id]:Array(n).fill(cid)}},cat),card=gear.card(cid,w);
+for(const[k,v]of Object.entries(card.trait))assert(Math.abs((withCards.stats[k]||0)-(base.stats[k]||0)-(card.stats[k]||0)*n-Math.min(w.CARD_TRAIT_CAP[k]??Infinity,v*n))<.001,'native summed trait cap '+k);
+const active=w.MONSTERS.find(m=>m.element==='ดวงดาว')||graded,pet=gear.pet(active.id,1000,w);assert(pet.st_int||active.element!=='ดวงดาว');
+const s={job:'mage',equip:{},pets:{[active.id]:1000},petActive:active.id},p=gear.totals(s,cat),inactive=gear.totals({...s,petActive:null},cat);assert(p.score>inactive.score);assert.deepEqual(inactive.stats,{});
+const acc=w.MONSTERS.find(m=>m.kind==='boss'),aid=w.ACC_CARD_PRE+acc.id;assert.deepEqual(gear.card(aid,w).stats,w.accCardBonus(aid));assert(gear.album(aid,w));
+const books=gear.totals({job:'mage',equip:{},bestiary:{[active.id]:1},accountBestiary:{[active.id]:150}},cat);assert(Object.keys(books.stats).length>0);
+console.log('PASS recorded native grade scaling, capped trait totals, accessory album rounding, active owned pet and account book separation');

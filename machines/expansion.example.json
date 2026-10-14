@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "enabled": true,
+  "activeCount": 3,
+  "capacityReason": "พัก ExampleRogueB, ExampleMageB, ExampleMonkB เพื่อลดภาระ CPU; เก็บแทงก์ ฮีล และธนูไว้ วัดผลก่อนเพิ่มจอ",
+  "machine": "vps",
+  "label": "VPS · ทีม 6 อาชีพ",
+  "leader": "ExampleTankB",
+  "guild": {
+    "name": "ExampleGuild",
+    "leader": "ExampleTankA"
+  },
+  "ssh": {
+    "host": "deploy@192.0.2.10",
+    "identityFile": "C:/Users/example-user/.ssh/asteria_example-vps_ed25519",
+    "bridge": "/opt/asteria-node-b/asteria/scripts/vps-panel-bridge.py"
+  },
+  "members": [
+    {
+      "machine": "vps",
+      "slot": 0,
+      "charName": "ExampleTankB",
+      "baseJob": "knight"
+    },
+    {
+      "machine": "vps",
+      "slot": 1,
+      "charName": "ExampleHealB",
+      "baseJob": "priest"
+    },
+    {
+      "machine": "vps",
+      "slot": 2,
+      "charName": "ExampleArcherB",
+      "baseJob": "ranger"
+    },
+    {
+      "machine": "vps",
+      "slot": 3,
+      "charName": "ExampleRogueB",
+      "baseJob": "assassin"
+    },
+    {
+      "machine": "vps",
+      "slot": 4,
+      "charName": "ExampleMageB",
+      "baseJob": "mage"
+    },
+    {
+      "machine": "vps",
+      "slot": 5,
+      "charName": "ExampleMonkB",
+      "baseJob": "monk"
+    }
+  ]
+}

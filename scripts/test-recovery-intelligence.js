@@ -1,0 +1,33 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {ProgressionController,task,goalChanges}=require('../src/runtime/progression-controller');
+const intelligence=require('../src/runtime/recovery-intelligence');
+const {ActionScheduler}=require('../src/runtime/action-scheduler');
+(async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-recovery-'));try{
+ let now=2000000,calls=0;
+ const before={saveAt:1,lv:100,exp:20,resources:{Ore:1}},after={saveAt:2,lv:100,exp:50,resources:{Ore:1}};
+ assert.deepEqual(goalChanges({objective:'wing'},before,after),[],'side EXP cannot conceal stalled ready wing');
+ assert.deepEqual(goalChanges({objective:'EXP'},before,after),['EXP']);
+ assert.deepEqual(goalChanges({objective:'wing'},before,{...after,wing:'new'}),['wing-state']);
+ const i={root,status:'playing',actorIdentity:{actorId:'actor-A'},lastSaveAt:now,lastSave:{lv:120,job:'high',coins:1000,bag:Array(48).fill('spare'),equip:{},storage:{gear:[]},potions:20},livePos:{room:'town',at:now},vitals:{at:now,hp:1},catalog:()=>({build:'b',world:{MAX_LV:120,bagCap:()=>48}}),v2:{sourceCoherence:{matches:true},scheduler:new ActionScheduler({now:()=>now})}};
+ const options={now:()=>now,adapters:{run:async()=>{calls++;return null;}}};
+ let c=new ProgressionController(root,'actor-A',options);
+ const sample=ms=>{now+=ms;i.lastSaveAt=i.livePos.at=i.vitals.at=now;return c.observe(i,now);};
+ const tick=()=>i.v2.scheduler.run('tick',()=>c.tick(i,{}));
+ c.observe(i,now);sample(100000);await tick();sample(46000);assert.equal(c.data.recoveryMemory.at(-1).result,'unconfirmed');
+ sample(75000);await tick();sample(46000);assert.equal(calls,2);
+ c=new ProgressionController(root,'actor-A',options);sample(1000000);
+ assert.equal(c.view().nextAction,null);assert.equal(c.view().recovery.needsDiagnosis,true);assert.deepEqual(c.view().recovery.suppressedActions,['inventory']);await tick();assert.equal(calls,2,'restart or expiry of rate limit cannot replay unchanged failed remedy');
+ const old=intelligence.signature(i,task(i,now));i.lastSave.coins++;sample(1000);assert.equal(intelligence.signature(i,task(i,now)),old,'incidental coin gain does not erase diagnosis');
+ i.lastSave.storage.gear.push({id:'spare'});sample(1000);assert.equal(c.view().nextAction,'inventory','new native duplicate evidence permits another guarded attempt');
+ await tick();i.lastSave.bag.pop();sample(1000);assert.equal(c.data.recoveryMemory.at(-1).result,'observed');
+ assert.equal(c.data.recoveryMemory.at(-1).evidence,'native_state_observed_not_causal_proof');
+ const v=c.view().recovery;assert(!JSON.stringify(intelligence.project({...v,password:'secret',attempts:[{action:'inventory',result:'unconfirmed',token:'secret'}]})).includes('secret'));
+ const fresh=new ProgressionController(root,'actor-B',options);fresh.observe(i,now);assert.equal(fresh.data.recoveryMemory,undefined,'memory never shared with a new identity');
+ assert.equal(intelligence.view(c.data,{...task(i,now),waitUntil:now+60000},{state:'attention',quietMs:999999},old,now).needsDiagnosis,false,'known scheduled waits do not trigger incident AI');
+ i.status='stopped';sample(100000);await tick();assert.equal(calls,3,'manual stop respected');
+ const inventory=require('../src/runtime/wing-inventory'),prepare=inventory.prepare;let wingCalls=0;
+ try{inventory.prepare=async()=>{wingCalls++;return {ok:true};};i.endgameCampaign={phase:'wing',ready:true};assert.match(await require('../src/runtime/progression-actions').run('inventory',i,{}),/ปีก/);assert.equal(wingCalls,1);}finally{inventory.prepare=prepare;}
+ fs.writeFileSync(c.file,JSON.stringify({...c.data,recoveryMemory:{bad:true}}));const corrupt=new ProgressionController(root,'actor-A',options);assert(corrupt.corrupt);assert.doesNotThrow(()=>corrupt.observe(i,now));assert.equal(JSON.parse(fs.readFileSync(c.file)).recoveryMemory.bad,true,'malformed new memory never overwritten');
+ console.log('PASS durable failed-remedy memory, evidence-change retry, native outcome separation, actor isolation, bounded privacy, known wait and targeted ready-wing recovery');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

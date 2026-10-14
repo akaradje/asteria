@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),{reconcile,summary}=require('../src/knowledge/notices');
+const parsed=notes=>({status:'parsed',notes,coverage:{complete:true}}),note={id:'n',title:'first',items:[]};
+let a=reconcile(null,parsed([note]),{at:1,build:'same'});
+const b=reconcile(a,parsed([{...note,title:'changed'}]),{at:2,build:'same'});
+assert.notEqual(a.revision,b.revision);assert.equal(b.changes[0].kind,'edited');
+assert.equal(b.notes[0].firstObservedAt,1);assert.equal(b.notes[0].availability,'announced_not_runtime_verified');
+const bad=reconcile(b,{status:'unsupported',coverage:{complete:false},errors:[{code:'schema'}]},{at:3});assert(!bad.fresh);assert.equal(bad.lastGoodAt,2);assert.equal(bad.notes[0].content.title,'changed');
+const gone=reconcile(b,parsed([]),{at:4});assert.equal(gone.retractions.length,1);
+const gated=reconcile(null,parsed([{...note,when:{kind:'runtime_visibility_gate',evaluated:false}}]),{at:5});assert.equal(gated.notes[0].visibility,'runtime_gate_unknown');
+const many=reconcile(null,parsed(Array.from({length:20},(_,i)=>({...note,id:String(i)}))));assert.equal(summary(many).omittedChanges,8);assert.equal(many.notes.length,20);
+console.log('PASS T12–T15/T37: same-build edit, retraction, gated scope, retained last-good and honest summary coverage');

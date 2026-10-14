@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('assert/strict'),{buildLaunchArgs}=require('../src/browserpool');
+const opts={noDraw:true,noGpu:false,softwareUi:true,gpuMemoryMb:512};
+let a=buildLaunchArgs(opts,'win32');assert(a.includes('--use-angle=d3d11'));for(const flag of ['--disable-gpu','--disable-gpu-compositing','--disable-gpu-rasterization','--disable-accelerated-2d-canvas','--use-angle=swiftshader'])assert(!a.includes(flag),'hardware Windows must not inherit '+flag);
+assert(a.includes('--force-high-performance-gpu'),'hybrid hardware Windows selects the dedicated GPU');
+assert(a.includes('--force-gpu-mem-available-mb=512'));assert(a.includes('--force-gpu-mem-discardable-limit-mb=128'));
+a=buildLaunchArgs({...opts,noGpu:true},'win32');assert(a.includes('--disable-gpu'));assert(a.includes('--use-angle=swiftshader'));assert(!a.includes('--use-angle=d3d11'),'explicit software fallback retained');
+assert(!a.includes('--force-high-performance-gpu'),'software fallback never forces a hardware GPU');
+a=buildLaunchArgs({...opts,noGpu:true},'linux');assert(a.includes('--use-angle=swiftshader'));assert(a.includes('--disable-gpu-compositing'));assert(!a.includes('--use-angle=d3d11'));
+a=buildLaunchArgs(opts,'linux');assert(a.includes('--disable-gpu-compositing'),'Linux low UI policy unchanged');assert(!a.includes('--use-angle=d3d11'));
+assert(!a.includes('--force-high-performance-gpu'),'Linux renderer policy remains unchanged');
+assert.throws(()=>buildLaunchArgs({...opts,gpuMemoryMb:1}),/budget/);assert.throws(()=>buildLaunchArgs({...opts,gpuMemoryMb:2049}),/budget/);
+const first=buildLaunchArgs(opts,'win32');first.push('mutated');assert(!buildLaunchArgs(opts,'win32').includes('mutated'),'launch arrays isolated');
+const w=require('../machines/windows/config.json').args;assert(w['keep-gpu']&&w['full-chrome']&&w['gpu-memory-mb']===256&&w.fps===20);
+console.log('PASS Windows explicit hardware raster, safe software/Linux backends, isolated args and retained GPU budget');

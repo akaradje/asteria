@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict'),s=require('../src/observability/v32-soak'),actor='actor-'+'a'.repeat(32),sourceRevision='b'.repeat(64);
+const r=s.begin({roster:[{actorId:actor,host:'windows',slot:0}],sourceRevision,build:'game',now:1000});const feed=at=>({at,machines:{windows:{build:'game',version:{loadedSystemRevision:sourceRevision},host:{freeMb:800}}},members:[{key:actor,online:true,detailsFresh:true,details:{identity:{actorId:actor},lv:120,lastSaveAt:at,levelProgress:{build:'game'}}}]});
+s.score(r,feed(1000),1000);s.score(r,feed(31000),31000);assert.equal(r.actors[actor].eligibleMs,30000);assert.equal(r.completePct,100);
+const stopped=at=>({at,machines:{windows:{running:false,operatorStopped:true,intentAt:at,intentAuthority:'local_controller'}}});s.score(r,stopped(61000),61000);s.score(r,stopped(91000),91000);assert.equal(r.actors[actor].eligibleMs,30000);assert.equal(r.actors[actor].pausedMs,30000);
+s.score(r,{},121000);s.score(r,{},151000);assert.equal(r.actors[actor].eligibleMs,60000,'unknown offline is not a proven manual stop');assert.equal(r.completePct,50);assert.equal(s.conclude(r,151000).longTermVerified,false);
+const newer=s.begin({roster:[{actorId:actor,host:'windows',slot:0}],sourceRevision,build:'game',requiredCapabilities:['craft'],now:0});s.score(newer,feed(0),0);s.score(newer,feed(30000),30000);s.conclude(newer,10800000);assert.equal(newer.longTermVerified,false);assert.deepEqual(newer.coverage.unexercised,['craft']);assert.throws(()=>s.begin({roster:[],sourceRevision,build:'b'}));
+console.log('PASS eligible operator-stop time, unknown offline penalty, actor/source/build alignment, actual duration and unexercised capability refusal');
+
+const moving=s.begin({roster:[{actorId:actor,host:'windows',slot:0}],sourceRevision,build:'game',now:0});s.score(moving,feed(0),0);s.score(moving,feed(30000),30000);const another='actor-'+'c'.repeat(32);s.changeRoster(moving,[...moving.roster,{actorId:another,host:'tum',slot:0}],2,30001);s.score(moving,feed(60000),60000);assert.equal(moving.actors[another].eligibleMs,0,'new actor gets no pre-admission hours');assert.equal(moving.cohortHistory.length,2);assert.throws(()=>s.changeRoster(moving,[{actorId:actor,host:'windows',slot:0}],2),/reused/);
+const independent=s.begin({roster:[{actorId:actor,host:'vps',slot:0}],sourceRevision,build:'game',now:1000,requiredCapabilities:['astral:aspt']}),native=feed(31000);native.machines={vps:native.machines.windows};native.members[0].details.capabilityCoverage={astral:{revision:'domain-one'}};native.members[0].details.capabilityOutcomes=[{actorId:actor,kind:'astral:aspt',build:'game',revision:'domain-one',authority:'server_socket',confirmed:true,receiptId:'native-aspt',at:30000},{actorId:another,kind:'astral:aspt',build:'game',revision:'domain-one',authority:'server_socket',confirmed:true,receiptId:'foreign',at:30000}];
+s.score(independent,native,31000);assert.equal(independent.previousComplete,true,'registered VPS is not overwritten');assert.equal(independent.actors[actor].outcomes.length,1);s.score(independent,native,32000);assert.equal(independent.actors[actor].outcomes.length,1,'same receipt counted once');native.members[0].details.capabilityCoverage.astral.revision='changed';native.members[0].details.capabilityOutcomes[0].receiptId='wrong-revision';s.score(independent,native,33000);assert.equal(independent.actors[actor].outcomes.length,1,'changed mechanic cannot use old proof');
+
+function fullRun({consoleMode=false,fps=true,staleProfile=false}={}){
+ const run=s.begin({roster:[{actorId:actor,host:'windows',slot:0}],sourceRevision,build:'game',now:0});
+ for(let at=0;at<=10800000;at+=30000){const f=feed(at),d=f.members[0].details;d.runtimeV2={observation:{nativeBotConsole:consoleMode}};d.stageProfile={at:staleProfile?0:at,eventLoop:{p95Ms:20},rssMb:300,stages:[{kind:'eval',samples:[{at:staleProfile?0:at,wallMs:30}]}]};if(fps){d.fps=consoleMode?0:20;d.fpsAt=at;}s.score(run,f,at);}
+ return s.conclude(run,10800000);
+}
+assert.equal(fullRun({fps:false}).longTermVerified,false,'three hours of fresh saves cannot pass absent visible FPS');
+assert.equal(fullRun({staleProfile:true}).longTermVerified,false,'old profiler values cannot fill the runtime acceptance sample budget');
+assert.equal(fullRun().longTermVerified,true,'fresh measured visible runtime passes the fixture acceptance');
+assert.equal(fullRun({consoleMode:true,fps:false}).longTermVerified,true,'explicit native console uses control/runtime metrics instead of rendering FPS');
+console.log('PASS required visible FPS coverage, stale-profile rejection and explicit non-drawing mode acceptance');

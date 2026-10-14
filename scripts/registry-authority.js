@@ -1,0 +1,8 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),{DurableStore}=require('../src/runtime/durable-store'),{Authority}=require('../src/registry/authority'),rpc=require('../src/registry/rpc');
+const root=path.resolve(__dirname,'..'),p=JSON.parse(fs.readFileSync(path.join(root,'machines/registry-authority.json')));
+const topology=require('../src/registry/topology').read(root),coordinator=topology.hosts[topology.coordinatorHost];
+if(p.version!==1||p.coordinatorHost!==topology.coordinatorHost||coordinator?.enabled!==true||coordinator.intermittent===true||p.port!==4873||process.platform!=='linux')throw Error('Registered 24/7 authority identity required');
+const store=new DurableStore(path.join(root,'logs/global-registry.db')),authority=new Authority(store),server=rpc.server(authority,{...p,onFeed:feed=>{if(feed.machine!=='tum'){const value={machine:feed.machine,at:feed.at,build:feed.build,members:feed.members};const native=require('../src/runtime/telemetry-file').writeTelemetry(path.join(root,'logs/fleet',feed.machine+'-v32.json'),value);if(!native.ok)throw Error('Native host feed persistence failed');const r=require('../src/runtime/telemetry-file').writeTelemetry(path.join(root,'logs/fleet',feed.machine+'.json'),value);if(!r.ok)throw Error('Host feed persistence failed');}},cooperation:()=>require('../src/registry/host-feed').primary(root)});
+server.listen(p.port,'127.0.0.1',()=>console.log(JSON.stringify({service:'asteria-registry-authority',protocol:1,pid:process.pid,revision:authority.data.revision})));
+server.on('error',()=>{store.close();process.exitCode=1;});process.on('SIGTERM',()=>server.close(()=>{store.close();process.exit(0);}));

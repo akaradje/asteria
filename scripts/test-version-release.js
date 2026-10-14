@@ -1,0 +1,20 @@
+'use strict';
+const fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_process'),crypto=require('crypto');
+const suites=['v3-contracts','v3-governor','v3-progression','work-continuity','resource-pressure','advisory-reload','farm-watchdog','night-training','training-route','exp-route-evidence','progression-priority','ai-advisor','auto-brain','automation-settings','game-knowledge','system-version','wiki-sync','startup-release-refresh','update-report','game-update-dashboard','knowledge-coherence','loaded-source','mastery-system','v2-integration','daily-team-activities','daily-dispatch','mechanics-flow','tower-team','craft-review','wing-recipes','legendary-goal','equipment-ceiling','equipment-foundation','boss-window','wing-team-helper','free-points','quest-development','team-trade','development-progress','enchant-action','enchant-plan','craft-portfolio','gear-priority','free-rewards','activity-control','first-class','survival-recovery','level-training','active-pet','top10-progression','server-rankings','competitive-gear','rankings-dashboard','town-service-budget','machine-config','expansion-team','shared-guild','expansion-dashboard','client-refresh','gate-walk','native-gates','runtime-observability','continuity-observer','dashboard-evidence','reports','resource-mode','potion-budget','browser-backend','character-journey','team-cooperation','learning-feedback-guards','federation','cross-party-bridge','supply-recovery'];
+suites.unshift('class-flow','fleet-transport','route-travel','field-map-walk','progression-core','equipment-headroom','personal-storage','field-preparation','campaign-side-work','boss-feed');
+suites.unshift('windows-runtime','renderer-health','eval-recycle','capped-hp-recovery','stability-recovery');
+suites.unshift('paid-progress');
+suites.unshift('class-support-peer');
+suites.unshift('promotion-execution');
+suites.unshift('progression-controller');
+function run(root,build,{machine:assignedMachine}={}){
+ const identity=require('../src/knowledge/loaded-source').capture(root,build),source=require('../src/knowledge/system-version').inventory(root);if(identity.missing.length)throw Error('Test build source missing');
+ const startedAt=Date.now(),rows=[];
+ for(const suite of suites){const file=path.join(root,'scripts','test-'+suite+'.js'),testSha256=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),result=cp.spawnSync(process.execPath,[file],{cwd:root,encoding:'utf8',timeout:120000,windowsHide:true});rows.push({suite,testSha256,exit:result.status,error:result.error?.message||null,output:(result.stdout+result.stderr).slice(0,5000)});console.log(suite+': '+(result.status===0?'PASS':'FAIL'));}
+ const after=require('../src/knowledge/system-version').inventory(root),current=require('../src/knowledge/loaded-source').capture(root,build),unchanged=after.fullRevision===source.fullRevision&&current.signature===identity.signature;
+ const machine=assignedMachine||(os.platform()==='win32'?'windows':'tum');if(!['windows','tum','vps'].includes(machine))throw Error('Unknown test machine');
+ const report={version:1,at:Date.now(),startedAt,machine,build,sourceRevision:source.revision,componentRevisions:Object.fromEntries(Object.entries(source.components).map(([k,v])=>[k,v.revision])),gameSourceHashes:identity.sourceHashes,unchanged,rows};
+ const file=path.join(root,'logs/system-audit/version-upgrade-tests-'+machine+'-'+build+'.json');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(report,null,2));console.log(JSON.stringify({machine,build,passed:rows.filter(r=>r.exit===0).length,total:rows.length,unchanged,file}));return report;
+}
+if(require.main===module){try{const root=path.resolve(__dirname,'..'),build=process.argv.find(a=>a.startsWith('--build='))?.slice(8)||JSON.parse(fs.readFileSync(path.join(root,'machines/fleet-client-release.json'))).build,machine=process.argv.find(a=>a.startsWith('--machine='))?.slice(10),r=run(root,build,{machine});if(!r.unchanged||r.rows.some(r=>r.exit!==0))process.exitCode=1;}catch(e){console.error(e.message);process.exitCode=1;}}
+module.exports={run,suites};

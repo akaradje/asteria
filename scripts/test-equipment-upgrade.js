@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('assert/strict'),vm=require('vm');
+const {GameInstance}=require('../src/instance');
+(async()=>{
+ const i={lastSave:{equip:{weapon:'old'}},async openGamePanel(){return {ok:true};},async closeGamePanel(){}};
+ let opened=false;
+ const tile={dataset:{k:'42'},title:'Better Blade',innerText:'',click(){opened=true;}};
+ const equip={disabled:false,click(){i.lastSave.equip.weapon='better';}};
+ const document={querySelectorAll(s){return s.includes('.tile')?[tile]:[];},querySelector(s){return s.includes('[data-act="equip"]')&&opened?equip:null;},getElementById(){return {hidden:!opened};}};
+ i.eval=code=>Promise.resolve(vm.runInNewContext(code,{document}));
+ const result=await GameInstance.prototype.equipItems.call(i,[{name:'Better Blade',id:'better',slot:'weapon'}]);
+ assert.equal(result.equipped,1);assert.equal(i.lastSave.equip.weapon,'better');
+ const {reserve}=require('../src/upgrade-reserve');
+ assert.equal(reserve({lv:110,job:'starweaver'},{HIGH_CLASSES:{chronomagus:{from:'starweaver'}},ASCEND:{coins:100000}}),111000);
+ assert.equal(reserve({lv:110,job:'chronomagus'},{HIGH_CLASSES:{chronomagus:{from:'starweaver'}}}),11000);
+ const economy=require('../src/economy'),world={HIGH_CLASSES:{chronomagus:{from:'starweaver'}}};
+ assert.equal(economy.canUse({jobs:['chronomagus']},'starweaver',world),false);
+ assert.equal(economy.canUse({jobs:['mage']},'chronomagus',world),true);
+ console.log('PASS icon-only gear tile, saved equip confirmation and High Class reserve');
+})().catch(e=>{console.error(e);process.exitCode=1;});

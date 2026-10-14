@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),vm=require('vm'),{project}=require('./tum-extra-view');
+const now=1000000,v={build:'current',sourceRevision:'same',loadedSystemRevision:'same',aligned:true};
+const sample={at:now,owner:{at:now,character:'YouLater',state:'running',token:'NEVER_PUBLIC'},extra:{snapshotAt:new Date(now).toISOString(),version:v,rows:[{char:'YouLater',status:'playing',lv:59,job:'ranger',exp:20,fps:20,saveAgeMs:1000,password:'NEVER_PUBLIC'}]},primary:{version:v}};
+assert.equal(project(sample,now).online,1);assert(!JSON.stringify(project(sample,now)).includes('NEVER_PUBLIC'));
+assert.equal(project({...sample,owner:{...sample.owner,state:'paused'}},now).online,0);
+assert.equal(project(sample,now+30000).online,0);assert.equal(project(sample,now-1).online,0);
+assert.equal(project({...sample,extra:{...sample.extra,version:{...v,aligned:false}}},now).online,0);
+assert.equal(project({...sample,extra:{...sample.extra,rows:[{...sample.extra.rows[0],char:'Other'}]}},now).online,0);
+assert.equal(project({...sample,at:now-25000},now).online,1);
+assert.equal(project({...sample,at:now-29000},now).online,0,'save age includes time since capture');
+let html='',host={hidden:false};const context={document:{getElementById:()=>host},esc:v=>String(v??'–').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),fmt:v=>Number.isFinite(v)?String(v):'–',age:()=>'',updateFleetDOM:(_,markup)=>{html=markup;}};
+vm.createContext(context);vm.runInContext(fs.readFileSync('src/public/fleet-extra.js','utf8'),context);
+context.renderTumExtra({...project(sample,now),message:'<img src=x>',details:{lv:59,job:'<script>bad</script>'}});
+assert(!html.includes('<img')&&!html.includes('<script>'));assert(html.includes('data-live-key="tum-extra-youlater"'));
+context.renderTumExtra(null);assert(host.hidden);
+console.log('PASS private-field omission, own/native source alignment, freshness/clock/save ages, independent solo display and escaped stable DOM');

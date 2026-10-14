@@ -1,0 +1,5 @@
+# Public source release — 2026-10-15 (Asia/Bangkok)
+
+This publication replaces private infrastructure/account references with examples and omits operational history, credentials, runtime data, browser profiles and downloaded game assets. It introduces public setup/check tools and publication guards. No live deployment, service restart or game action is performed by this publication. Public validation results will be recorded after checks; production acceptance history is intentionally excluded.
+
+Validation: npm ci completed and the named public offline suite passed 10/10. Syntax parsing passed for 688 JavaScript and 9 Python files. Staged publication guard and local known-private-value comparison passed across 752 files; negative tests confirmed private files and staged credential URLs are rejected even when the working file is clean. Gitleaks found no secrets in the sanitized source scan; complete commit-history scan is required before push. No native game acceptance or live deployment was run for this export.

@@ -1,0 +1,31 @@
+'use strict';
+const assert=require('assert/strict'),value=require('../src/planning/acquisition-value'),work=require('../src/planning/progression-work'),portfolio=require('../src/planning/craft-portfolio');
+const need={have:9,want:10},craft={gain:30,fillsEmpty:false};
+assert.equal(value.effort(need,{ratePct:25}),4);
+assert.equal(value.effort(need,{ratePct:0}),Infinity);
+const ready=value.value(craft,need,{ratePct:25},{finishable:true,travelMs:0});
+assert.equal(ready.expectedKills,4);
+assert(ready.score>value.value(craft,need,{ratePct:1},{finishable:true}).score,'rare drop costs more expected kills');
+assert(ready.score>value.value(craft,{have:0,want:1000},{ratePct:25},{finishable:true}).score,'large remaining quantities are lower priority');
+assert(ready.score>value.value({gain:10000,fillsEmpty:true},need,{ratePct:100},{finishable:false}).score,'a blocked aspirational recipe cannot outrank an attainable upgrade');
+assert(ready.score>value.value(craft,need,{ratePct:25},{finishable:true,travelMs:155000}).score,'travel overhead reduces value');
+const at=Date.now(),wiki={maps:{maps:[{id:'e1',name:'Easy',kind:'field',levelMin:1,levelMax:20,monsters:{normal:['rat']}}]},monsters:{monsters:[{id:'rat',name:'Rat',kind:'normal',level:10,dropTable:[{item:'Ore',ratePct:50}]}]}};
+const unreachable=Array.from({length:8},(_,n)=>({id:'dream'+n,name:'Dream',gain:1000-n,missing:[{name:'Unknown',have:0,want:1}],cost:{Unknown:1}})),attainable={id:'real',name:'Real armor',gain:20,missing:[{name:'Ore',have:1,want:2}],cost:{Ore:2}};
+const cat={build:'test',world:{MAX_LV:120}},save={lv:120,coins:50000,potions:0,consumables:{'White Potion':20},bestiary:{rat:10},equip:{},materials:{Ore:1}};
+const p=portfolio.portfolio([...unreachable,attainable],save,cat,wiki);
+assert.equal(p.workCandidates.length,8,'all alternative recipes are available to runtime assessment');
+const actor={lastSave:save,lastSaveAt:at,vitals:{hp:1,at},livePos:{room:'e1',at},catalog:()=>cat,endgameCampaign:{phase:'complete'},developmentProgress:{at,build:'test',craftPortfolio:{selected:unreachable[0],alternatives:unreachable.slice(1,7),workCandidates:[...unreachable.slice(1),attainable]}},brain:{blocked:()=>({})}};
+const result=work.assess(actor,wiki,null,at);
+assert.equal(result.candidates[0].itemId,'real','reachable recipe beyond the dashboard top six is still scheduled');
+assert.equal(result.candidates[0].acquisition.finishable,true);
+assert.equal(result.candidates[0].acquisition.expectedKills,2);
+actor.lastSaveAt=at-31000;assert.equal(work.assess(actor,wiki,null,at).candidates.length,0,'stale evidence cannot schedule acquisition');actor.lastSaveAt=at;
+// The team helper must count high-level HP supplies, without sending stale work.
+actor.progressionWork=result;actor.root=require('os').tmpdir();
+const brain=require('../src/character-brain'),load=require('../src/economy').loadWiki,profile=brain.profile;
+try{brain.profile=()=>({craft:null});require('../src/economy').loadWiki=()=>wiki;
+ const team=require('../src/planning/team-workboard').project(actor);assert(team.helper);assert(team.needs.some(n=>n.name==='Ore'&&n.want===2&&n.kind==='craft-alternative'));
+ actor.progressionWork={...result,build:'old'};assert(!require('../src/planning/team-workboard').project(actor).needs.some(n=>n.kind==='craft-alternative'));
+ actor.lastSave.consumables['White Potion']=19;assert(!require('../src/planning/team-workboard').project(actor).helper);
+}finally{brain.profile=profile;require('../src/economy').loadWiki=load;}
+console.log('PASS remaining quantity/drop odds/travel ranking, attainable over blocked recipes, full alternative scan, stale-build guards and high-level HP supply helpers');

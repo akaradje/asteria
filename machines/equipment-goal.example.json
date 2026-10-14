@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "rarity": "legendary",
+  "refine": "native-max",
+  "top10Progression": true,
+  "bridgeOwned": true,
+  "nightTraining": {
+    "enabled": true,
+    "target": 120,
+    "continueUntilTarget": true,
+    "startedAt": "2026-10-04T22:00:00+07:00",
+    "deadline": "2026-10-05T06:00:00+07:00"
+  },
+  "unsupportedRefineSlots": [],
+  "reason": "Native maximum and risk per loaded patch. Role-weighted positive expected combat value, owned guardian/spare and protected supply budgets; compare all native combat paths without fixed equipment-first gates. Native receipts/no replay/operator/host scope remain mandatory.",
+  "freshRefineAfterClosedOutcome": true,
+  "adaptiveNormalMaterials": true,
+  "nativeMax": true,
+  "dynamicProgression": true,
+  "adaptiveCombatROI": true,
+  "allowDestructiveWithPositiveEVAndSpare": true,
+  "ownedGuardianStone": true
+}

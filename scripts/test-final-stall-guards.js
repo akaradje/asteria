@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path'),side=require('../src/planning/boss-window'),trade=require('../src/runtime/team-trade');
+const wiki={maps:{maps:[{id:'w1',kind:'field',levelMin:1,monsters:{normal:['puff','mid']}}]},monsters:{monsters:[{id:'puff',name:'Puff',kind:'normal',level:5},{id:'mid',name:'Mid',kind:'normal',level:50}]}};
+const save={lv:120,pets:{puff:1000},bestiary:{puff:2775,mid:200}};
+assert(!side.sideSources(save,wiki).some(g=>g.monsterId==='puff'),'already owned pet cannot keep pointless unlock assignment');assert.equal(side.sideSources(save,wiki)[0].threshold,1500);assert.equal(side.sideSources({...save,pets:{},bestiary:{puff:150,mid:1500}},wiki)[0].threshold,500);assert.equal(side.sideSources({...save,bestiary:{puff:2775,mid:1500}},wiki).length,0,'completed unlock threshold waits for actual save rather than farming extra kills');
+(async()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-terminal-trade-'));try{
+ const now=Date.now(),offer={donor:'ExampleAccount2',receiver:'ExampleAccount12',kind:'material',name:'Ancient Bark',quantity:1};let cancels=0;
+ const i={root,character:{name:'ExampleAccount12'},catalog:()=>({build:'fixture'}),lastSaveAt:now-300000,lastSave:{},teamTradeIntent:{id:'fixture',build:'fixture',phase:'UNCERTAIN',offer,startedAt:now-600000},tradeJournal:{id:'fixture',sessionId:7,phase:'UNCERTAIN',sent:{}},tradeJournalFile:path.join(root,'journal.json'),socialLast:async t=>t==='tropen'?{id:7,with:{name:'ExampleAccount2'}}:null,socialSend:async t=>{assert.equal(t,'trcancel');cancels++;}};
+ assert(trade.cleanupPending(i));assert((await trade.tick(i,{})).includes('cancelled'));assert.equal(cancels,1);assert(!trade.cleanupPending(i));await trade.tick(i,{});assert.equal(cancels,1);assert.equal(i.tradeJournal.phase,'UNCERTAIN','cleanup cannot fabricate successful transfer');
+ i.tradeJournal.sent={};i.socialLast=async t=>t==='tropen'?{id:8,with:{name:'Other'}}:null;await trade.tick(i,{});assert.equal(cancels,1,'foreign session untouched');
+ const wrapper=fs.readFileSync(path.join(__dirname,'../src/runtime/v2-instance.js'),'utf8');assert(wrapper.indexOf('trade.cleanupPending(this)')<wrapper.indexOf('v.freshness=decisionGate(this'),'owned terminal cancellation must run before stale-save gate');
+ console.log('PASS exact pet unlock thresholds, no owned-pet farming loop, terminal owned trade cancel before freshness gate, no foreign cancel or false success');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1});

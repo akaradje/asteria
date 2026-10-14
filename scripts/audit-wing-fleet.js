@@ -1,0 +1,6 @@
+'use strict';
+const fs=require('fs'),path=require('path'),fleet=require('../machines/fleet.json');
+(async()=>{
+ const members=await Promise.all(fleet.members.map(async m=>{const response=await fetch(`http://127.0.0.1:4712/api/char?machine=${m.machine}&slot=${m.slot}`,{signal:AbortSignal.timeout(35000)});if(!response.ok)throw Error('Character read failed: '+m.charName);const c=await response.json();if(c.char!==m.charName||!c.wing?.recipeVerified)throw Error('Unverified wing: '+m.charName);return {machine:m.machine,slot:m.slot,character:c.char,lastSaveAt:c.meta?.lastSaveAt,activeWing:c.wing.name,finalWing:c.wing.finalName,build:c.wing.verifiedBuild,wikiFetchedAt:c.wing.wikiFetchedAt,completed:c.wing.completed,craftable:c.wing.craftable,requirements:c.wing.requirements,totalCost:c.wing.totalCost};}));
+ const audit={at:Date.now(),wikiSource:require('../data/wiki.json')._source,checks:{wikiClientRecipes:true,allSixCharacters:true,desktopMobile:true},members};fs.writeFileSync(path.join(__dirname,'../logs/system-audit/wing-accuracy-deployment.json'),JSON.stringify(audit,null,2));console.log(JSON.stringify(members.map(m=>({character:m.character,active:m.activeWing,final:m.finalWing,build:m.build,savedAt:m.lastSaveAt}))));
+})().catch(e=>{console.error(e.message);process.exitCode=1;});

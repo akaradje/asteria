@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "teams": {
+    "tum": {"leader": "ExampleTankA", "members": ["ExampleTankA", "ExampleHealA", "ExampleArcherA"]},
+    "vps": {"leader": "ExampleTankB", "members": ["ExampleTankB", "ExampleHealB", "ExampleArcherB"]}
+  }
+}

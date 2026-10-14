@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "coordinatorHost": "tum",
+  "port": 4873,
+  "adminHost": "windows",
+  "hosts": {}
+}

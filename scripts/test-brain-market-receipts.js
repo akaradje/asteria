@@ -1,0 +1,21 @@
+'use strict';
+const a=require('node:assert/strict'),{SocialInbox}=require('../src/runtime/social-inbox'),r=require('../src/runtime/market-receipts');
+const inbox=new SocialInbox();inbox.generation=3;inbox.clear();
+const context={actorId:'actor-a',sessionStartedAt:100,generation:3,build:'b',baselineRev:7};
+const row={marketContractVersion:2,context,marketBaselineSequence:0,marketCommandSequence:0,dispatchAt:200,target:{listingId:11,item:'Horn',n:2,price:500}};
+const packet={t:'mkr',op:'mbuy',ok:1,rev:8,res:{item:'Horn',n:2,price:500,seller:'PRIVATE'},d:{coins:-500,mats:{Horn:2}}};
+inbox.sent(JSON.stringify({t:'mbuy',lid:11}),200);inbox.receive(JSON.stringify(packet),201);const receipt=inbox.last('mkr');a(r.matches(row,receipt));row.nativeReceipt=r.proof(row,receipt);a(r.persisted(row));a(!JSON.stringify(inbox).includes('PRIVATE'));
+for(const change of [{_generation:4},{_nativeMarket:false},{_sequence:0},{_receivedAt:200},{rev:7},{_deltaValid:false},{d:{coins:-499,mats:{Horn:2}}},{d:{coins:-500,mats:{Horn:2,Other:1}}},{d:{coins:-500,mats:{Horn:2},tokens:1}},{op:'mlist'}])a(!r.matches(row,{...receipt,...change}),JSON.stringify(change));
+for(const change of [{actorId:'other'},{generation:4},{sessionStartedAt:101},{build:'other'}])a(!r.sameContext(context,{...context,...change}));
+inbox.generation=4;inbox.clear();a(inbox.owns('mkr'));a.equal(inbox.last('mkr'),null,'no previous-page fallback after reconnect');
+inbox.receive(JSON.stringify({...packet,d:{coins:-500,mats:{Horn:2},token:'SECRET'}}),202);a.equal(inbox.last('mkr')._deltaValid,false);a(!JSON.stringify(inbox).includes('SECRET'));
+inbox.receive(JSON.stringify({t:'mk',now:203,list:[{id:11,item:'Horn',kind:'stack',n:2,price:500,mine:0,expires:999}],mine:[],total:1}),203);a.equal(inbox.last('mk').list[0].id,11);a.equal(inbox.last('mk')._generation,4);
+const load=require('../src/runtime/market-load'),pending={...row,id:'new',kind:'market-class',externalOwner:'class-market',status:'UNCERTAIN',build:'b',before:{coins:1000},beforeMaterial:0,deadline:300};
+let finished=0;const journal={rows:[pending],save(){}},claims={finish(){finished++;}},save={coins:500,materials:{Horn:2}},opts={at:500,sessionStartedAt:400,rev:9,build:'b',actorId:'actor-a'};
+const proof=pending.nativeReceipt;pending.nativeReceipt=null;a.deepEqual(load.reconcile(journal,claims,save,opts),[],'matching balances alone cannot settle a new market contract');pending.nativeReceipt=proof;a.deepEqual(load.reconcile(journal,claims,save,{...opts,actorId:'other'}),[]);a.deepEqual(load.reconcile(journal,claims,save,opts),['new']);a.equal(finished,1);
+console.log('PASS native market actor/session/build/generation/watermark/delta, redaction and restart proof');
+
+const rejects=new SocialInbox();rejects.generation=3;rejects.clear();rejects.sent(JSON.stringify({t:'mbuy',lid:11}),200);rejects.receive(JSON.stringify({t:'mkr',op:'mbuy',no:'gone'}),201);a(r.rejected(row,rejects.last('mkr')));
+rejects.clear();rejects.sent(JSON.stringify({t:'mbuy',lid:11}),200);rejects.sent(JSON.stringify({t:'mbuy',lid:12}),200);rejects.receive(JSON.stringify({t:'mkr',op:'mbuy',no:'gone'}),201);a(!r.rejected(row,rejects.last('mkr')),'overlapping commands cannot release the original hold');
+a(!r.matches(row,{...receipt,_command:{...receipt._command,lid:12}}));
+a(!r.rejected(row,{...receipt,ok:false,no:'gone',d:{},_deltaValid:false}),'an unknown native delta cannot release a hold');

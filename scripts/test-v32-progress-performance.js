@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {analyze}=require('../src/runtime/wait-graph'),{changes,measure}=require('../src/runtime/progression-controller');
+let graph=analyze([{id:'storage',waitsFor:['trade'],owner:'inventory'},{id:'trade',waitsFor:['craft'],owner:'trade',cancellable:true},{id:'craft',waitsFor:['storage'],owner:'craft'}]);assert.equal(graph.cycles.length,1);assert.equal(graph.cycles[0].remedy.owner,'trade');
+graph=analyze([{id:'trade',waitsFor:['trade'],owner:'trade',cancellable:true,committed:true}]);assert.equal(graph.cycles[0].remedy.action,'obtain_native_evidence');
+const now=Date.now(),i={lastSaveAt:now,lastSave:{equip:{weapon:'a'},refine:{a:1},job:'high',jobLv:70,lv:120,exp:0},catalog:()=>({items:{a:{rarity:'epic'},b:{rarity:'epic'},c:{rarity:'legendary'}}})};
+const before=measure(i);i.lastSaveAt++;i.lastSave.equip.weapon='b';i.lastSave.refine.b=1;assert.equal(changes(before,measure(i)).length,0,'equal gear swap cannot reset progress clock');
+i.lastSave.equip.weapon='c';assert(changes(before,measure(i)).includes('equipment-improvement'));
+const h=require('../src/observability/runtime-health'),actor={status:'playing',lastSaveAt:now,livePos:{at:now},lastFps:0,lastFpsAt:now,v2:{observation:{at:now,connected:true,nativeBotConsole:true}}};assert.equal(h.diagnose(actor,now).state,'working');
+const p=new(require('../src/observability/stage-profiler').StageProfiler)(),start=p.begin();p.end('fixture',start);const view=p.view();assert.equal(view.stages.length,1);assert(Number.isFinite(view.stages[0].samples[0].cpuMs));assert.match(view.scope,/not_isolated_actor_cpu/);assert.equal(p.view(),view);p.close();
+console.log('PASS semantic equipment progress, explicit wait-cycle remedy owner, committed safety, native text-mode FPS and scoped bounded profiling');

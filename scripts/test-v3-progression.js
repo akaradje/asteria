@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('assert/strict'),{plan}=require('../src/planning/progression-dag'),{diagnose}=require('../src/runtime/v3-incidents');
+const now=1000000,cat={build:'b1',items:{w:{id:'w',slot:'weapon'},wing:{id:'wing',slot:'wing'}},world:{MAX_LV:120,REFINE:{max:10,chance:[100]},MONSTERS:[{id:'pet'}]}};
+const i={catalog:()=>cat,lastSaveAt:now,livePos:{at:now,room:'w1'},lastSave:{lv:120,job:'asura',petActive:'pet',pets:{pet:0},equip:{wing:'wing',weapon:'w'},refine:{w:10},potions:40,bag:[],materials:{Ore:1},coins:10000},v2:{sourceCoherence:{matches:true},journal:{pending:()=>false},objective:{nodes:[{id:'w',owned:true}],targets:[{id:'w',slot:'weapon'}]}}};
+let p=plan(i,now);assert(p.milestones.equipmentAllowed);assert.equal(p.nodes.find(r=>r.id==='refine:weapon').state,'verified');assert.equal(p.activitiesEnabled,false,'paused guild activities are not enabled by progression');
+i.lastSave.petActive=null;p=plan(i,now);assert.equal(p.milestones.stage,'pet');assert.equal(p.selected,'pet');
+i.v2.journal.pending=()=>true;p=plan(i,now);assert.equal(p.selected,null);assert(p.nodes.some(n=>n.state==='reconcile'));i.v2.journal.pending=()=>false;
+i.lastSaveAt=now-31000;p=plan(i,now);assert(!p.fresh);assert.equal(p.selected,null);
+i.lastSaveAt=now;i.lastSave.petActive='pet';i.v2.objective={nodes:[{id:'a',dependencies:['b'],cost:{Ore:1}},{id:'b',dependencies:['a'],cost:{Ore:1}}],targets:[{id:'a',slot:'weapon'}]};p=plan(i,now);assert(p.graphInvalid);assert.equal(p.selected,null,'cyclic recipe cannot be selected');
+let d=diagnose({...i,lastFps:11,lastFpsAt:now},now);assert(d.some(r=>r.id==='low_fps'));assert(!d.some(r=>r.id==='save_stale'));d=diagnose({...i,lastSaveAt:now-31000,lastFps:0,lastFpsAt:now-16000},now);assert(d.some(r=>r.id==='save_stale'));assert(!d.some(r=>r.id==='low_fps'),'old FPS is not a measured lowFPS incident');
+const optional=require('../src/runtime/v3-instance').optionalWork;assert(!optional({...i,resourceHealth:{mode:'reduced',at:now}},now));assert(optional({...i,resourceHealth:{mode:'reduced',at:now-46000}},now));
+console.log('PASS native pet/class/wing/equip/+10 states, pending/stale exclusion, recipe-cycle rejection, activity pause, incident causality and optional-work expiry');

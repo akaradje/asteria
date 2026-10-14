@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('assert/strict'),e=require('../src/economy'),p=require('../src/planning/active-pet');
+const cat=e.loadCatalog(process.cwd(),'f3dc944');
+const fire={id:'fire',name:'Fire',kind:'normal',race:'สัตว์',element:'ไฟ',level:100},spirit={id:'spirit',name:'Spirit',kind:'normal',race:'วิญญาณ',element:'น้ำ',level:20},prey={id:'prey',kind:'normal',level:40};
+cat.world={...cat.world,MONSTERS:[fire,spirit,prey]};
+const now=Date.now(),s={lv:120,job:'chronomagus',equip:{},pets:{fire:1000,spirit:0},potions:10};
+const original=JSON.stringify(s),d=p.development(s,cat);assert.equal(d.best.id,'fire');assert.equal(d.target.id,'spirit');assert.equal(d.target.remainingKills,1000);assert.equal(JSON.stringify(s),original,'projection cannot mutate actual friendship');
+const i={lastSave:s,goal:{mapId:'n1',monsterId:'prey'},livePos:{room:'n1',at:now},vitals:{at:now,hp:.95}};
+assert.equal(p.choose(i,cat,now).selected.id,'spirit');assert.equal(p.choose(i,cat,now).mode,'training');
+for(const change of [{vitals:{at:now,hp:.8}},{vitals:{at:now-10001,hp:1}},{livePos:{room:'town',at:now}},{livePos:{room:'n1',at:now+1}},{bossWindow:{departAt:now+120000}},{bossWindow:{phase:'boss-live'}},{teamControl:{}},{survivalRecovery:true},{survivalStatus:{deaths:[{}]}},{goal:{mapId:'n1',monsterId:'unknown'}},{lastSave:{...s,potions:0}}])assert.equal(p.choose({...i,...change},cat,now).mode,'combat',JSON.stringify(change));
+prey.kind='boss';assert.equal(p.choose(i,cat,now).mode,'combat');prey.kind='normal';prey.level=120;assert.equal(p.choose(i,cat,now).mode,'combat');
+assert.equal(p.development({...s,pets:{}},cat).target,null);assert.equal(p.development({...s,pets:{spirit:1000}},cat).target,null);
+console.log('PASS owned growth projection, immutable saves, safe training and restoration for boss/HP/death/travel/supply/stale position; no fabricated pets');

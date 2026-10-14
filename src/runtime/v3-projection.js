@@ -1,0 +1,10 @@
+'use strict';
+// Shared remote/mobile allowlist. Never transmit raw journals or file paths.
+function project(v){if(!v)return null;const p=v.progression||v.plan,t=v.experiments;
+ return {version:3,at:v.at,optionalWork:v.optionalWork,incidents:{open:(v.incidents?.open||v.health?.open||[]).slice(0,12).map(r=>Object.fromEntries(['id','reason','owner','at','lastSeenAt','deadline','nextCheckAt','overdue','remedy'].map(k=>[k,r[k]])))},progression:p?{at:p.at,build:p.build,fresh:p.fresh,pending:p.pending,graphInvalid:p.graphInvalid,selected:p.selected,milestones:p.milestones,nodes:p.nodes?.slice(0,40),verified:p.verified?.slice(-4)}:null,experiments:t?{version:3,observedMs:t.observedMs,explorationMs:t.explorationMs,maxExplorationFraction:t.maxExplorationFraction,rows:t.rows?.slice(0,4).map(r=>Object.fromEntries(['id','status','phase','at','finishedAt','baseline','candidate','baselineRate','candidateRate','confirmationRate','bootstrap','deadline','reason','causalVerified'].map(k=>[k,r[k]])))}:null};
+}
+const baseProject=project;
+function controller(c){if(!c)return null;const keys=['version','at','build','taskKey','objective','target','state','reason','owner','startedAt','lastResultAt','lastActivityAt','quietMs','nextAction','nextCheckAt','waitUntil','recentAttempts','uncertainResources'];
+ return {...Object.fromEntries(keys.map(k=>[k,c[k]])),recovery:require('./recovery-intelligence').project(c.recovery),waitGraph:c.waitGraph?{cycles:c.waitGraph.cycles.slice(0,8).map(r=>({nodes:r.nodes,remedy:{owner:r.remedy.owner,action:r.remedy.action}}))}:null,nodes:(c.nodes||[]).slice(0,12).map(n=>({id:n.id,depends:n.depends?.slice(0,6),state:n.state})),learning:c.learning?{scope:c.learning.scope,routePolicy:c.learning.routePolicy,observedOutcomes:c.learning.observedOutcomes}:null,history:(c.history||[]).slice(-6).map(r=>Object.fromEntries(['at','kind','action','fields','evidence','objective','target','build'].map(k=>[k,r[k]])))};
+}
+module.exports={project:v=>v?{...baseProject(v),controller:controller(v.controller)}:null,controller};

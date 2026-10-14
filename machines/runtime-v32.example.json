@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "enabled": true,
+  "realm": "asteria-online.io",
+  "epoch": "obt-2026-10-03",
+  "epochEvidence": "user-confirmed OBT reset, 2026-10-03",
+  "policyRevision": 1,
+  "mode": "observe",
+  "durableDocuments": true,
+  "astralActions": false,
+  "requiredClassLines": [
+    "knight",
+    "priest",
+    "ranger",
+    "assassin",
+    "mage",
+    "monk"
+  ],
+  "dynamicActivities": true,
+  "adaptiveCombatActions": true
+}

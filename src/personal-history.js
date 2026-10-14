@@ -1,0 +1,14 @@
+'use strict';
+const fs=require('fs'),path=require('path'),crypto=require('crypto');
+// Only game measurements: never persist login IDs, credentials or raw save packets.
+function numericMap(value){return Object.fromEntries(Object.entries(value||{}).filter(([k,v])=>k.length>0&&k.length<=100&&!/[\u0000-\u001f]/.test(k)&&!['__proto__','prototype','constructor'].includes(k)&&Number.isFinite(v)));}
+function snapshot(s){const out={};for(const k of ['lv','exp','coins','jobLv','jobExp','statPoints','skillPoints','pts','skPts','qIndex','potions','runeDust','tokens'])if(Number.isFinite(s[k]))out[k]=s[k];if(typeof s.job==='string'&&/^[\w-]{1,80}$/.test(s.job))out.job=s.job;for(const k of ['st','skills','bestiary','materials','refine','consumables','keyItems'])out[k]=numericMap(s[k]);out.equip=Object.fromEntries(Object.entries(s.equip||{}).filter(([k,v])=>/^[\w-]{1,80}$/.test(k)&&typeof v==='string'&&/^[\w-]{1,100}$/.test(v)));return out;}
+class PersonalHistory{
+ constructor(root,{machine}={}){this.dir=path.join(root,'logs','personal-history');this.machine=['windows','tum','vps'].includes(machine)?machine:process.platform==='win32'?'windows':'tum';this.days=new Map();this.pending=[];this.lastSnapshot={};}
+ identity(name){return crypto.createHash('sha256').update(this.machine+'\0'+name).digest('hex').slice(0,24);}
+ document(name,at){const day=new Date(at).toISOString().slice(0,10),id=this.identity(name),key=id+'/'+day;let d=this.days.get(key);if(!d){const file=path.join(this.dir,id,day+'.json');try{d=JSON.parse(fs.readFileSync(file,'utf8'));}catch{d={version:1,machine:this.machine,character:name,identity:id,day,minutes:{},snapshots:[],events:[]};}d.file=file;this.days.set(key,d);}return d;}
+ save(name,s,build,now){if(!name)return;const state=snapshot(s),fingerprint=JSON.stringify(state),previous=this.lastSnapshot[name];if(previous&&now-previous.at<60000)return;this.lastSnapshot[name]={at:now,fingerprint};this.pending.push({name,at:now,kind:'snapshot',value:{at:now,build,state,changed:!previous||previous.fingerprint!==fingerprint}});}
+ event(name,event,build){if(name)this.pending.push({name,at:event.at,kind:'event',value:{...event,build}});}
+ flush(rows,build,now){const dirty=new Set();for(const r of rows){if(!r.name)continue;for(const b of r.buckets||[]){const d=this.document(r.name,b.at),key=b.at+':'+(b.build||build);if(JSON.stringify(d.minutes[key])!==JSON.stringify(b)){d.minutes[key]={...b};dirty.add(d);}}}for(const p of this.pending){const d=this.document(p.name,p.at);d[p.kind==='snapshot'?'snapshots':'events'].push(p.value);dirty.add(d);}for(const d of dirty){fs.mkdirSync(path.dirname(d.file),{recursive:true});const {file,...data}=d;data.recordedAt=now;fs.writeFileSync(file+'.tmp',JSON.stringify(data));fs.renameSync(file+'.tmp',file);}this.pending=[];for(const [key,d]of this.days)if(d.day<new Date(now-86400000).toISOString().slice(0,10))this.days.delete(key);}
+}
+module.exports={PersonalHistory,snapshot};

@@ -1,0 +1,4 @@
+'use strict';
+const {sshCapture}=require('../src/runtime/fleet-transport'),fleet=require('../machines/fleet.json');
+const code=`const fs=require('fs');const c=JSON.parse(fs.readFileSync('logs/pvp-command.json'));console.log(JSON.stringify({target:c.target,expiresAt:c.expiresAt,at:Date.now()}));if(fs.existsSync('logs/pvp'))for(const f of fs.readdirSync('logs/pvp').filter(x=>x.endsWith('.json'))){const p=JSON.parse(fs.readFileSync('logs/pvp/'+f));console.log(JSON.stringify({name:p.character,at:p.at,phase:p.phase,players:p.players,stats:p.stats,result:p.result}))}`;
+const b64=Buffer.from(code).toString('base64');sshCapture(['-n','-o','BatchMode=yes',fleet.ssh.host,`cd /opt/asteria-node-a/asteria && node -e 'eval(Buffer.from("${b64}","base64").toString())'`],{timeout:20000,maxBuffer:30000},(e,o)=>{if(e){console.error(e.message);process.exitCode=1;}else console.log(o.trim());});

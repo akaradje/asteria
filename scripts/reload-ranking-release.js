@@ -1,0 +1,5 @@
+'use strict';
+const {sshCapture,encode,decode}=require('../src/runtime/fleet-transport'),fleet=require('../machines/fleet.json');
+function remote(route){return new Promise((resolve,reject)=>sshCapture(['-n','-o','BatchMode=yes','-o','ConnectTimeout=5',fleet.ssh.host,'python3',fleet.ssh.exchange.replace(/fleet-exchange\.py$/,'fleet-panel-bridge.py'),encode({route})],{timeout:120000,maxBuffer:2000000},(error,result)=>error?reject(error):resolve(decode(result))));}
+async function windows(route){const response=await fetch('http://127.0.0.1:4711/api/'+route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({n:3,nodraw:true,god:true,autoBuild:true}),signal:AbortSignal.timeout(120000)});if(!response.ok)throw Error('Windows '+route+' failed '+response.status);return response.json();}
+(async()=>{for(const machine of ['windows','tum']){const call=machine==='windows'?windows:remote;await call('stop');console.log(machine+' farm stopped');await call('start');console.log(machine+' farm start requested');}})().catch(e=>{console.error(e.message);process.exitCode=1;});

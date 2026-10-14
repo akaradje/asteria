@@ -1,0 +1,32 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
+const {ResultLedger}=require('../src/result-ledger'),gear=require('../src/gear-value'),{check,tactics}=require('../src/team-readiness'),{DungeonLearning}=require('../src/dungeon-learning');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-team-development-'));
+try{
+ const l=new ResultLedger(root,0),s={coins:5000,refine:{w:1},equip:{weapon:'w'},bag:[],runeDust:50};
+ l.context={actorId:'fixture',sessionStartedAt:1,generation:1,build:'fixture',baselineRev:10};l.expectedCost={Copper:100};assert(l.begin('refine',{id:'w'},s,100));assert.equal(l.begin('craft',{},s,101),null);
+ let recovered=new ResultLedger(root,0,200);assert(recovered.pending());recovered.observe(s,200);assert(recovered.pending());
+ const proof=at=>({authority:'server_accepted_save',actorId:'fixture',sessionStartedAt:1,generation:1,build:'fixture',requestAt:at,at:at+1,rev:11});recovered.context=l.context;recovered.expectedCost={Copper:100};const after={...s,coins:4900,refine:{w:2}};recovered.observe(after,300);assert(recovered.pending(),'outgoing state keeps the claim pending');assert.equal(recovered.rows[0].cost.coins,100);assert.equal(recovered.rows[0].evidence,'outgoing_client_save');assert(recovered.acknowledgeAcceptedSave(after,proof(300)));assert(!recovered.pending());
+ recovered.begin('enchant',{id:'w'},s,400);recovered.observe({...s,runeDust:20},401);assert.equal(recovered.rows[0].status,'spent_without_change');
+ recovered.expectedCost={Copper:300};const batch=recovered.begin('refine',{id:'w'},s,500,true);recovered.observe({...s,coins:4900,refine:{w:2}},501);assert(recovered.pending());const batchAfter={...s,coins:4700,refine:{w:3}};recovered.observe(batchAfter,502);recovered.seal(batch.id);assert(recovered.pending('refine'));assert.equal(batch.cost.coins,300);assert.equal(batch.after.refine.w,3);assert(recovered.acknowledgeAcceptedSave(batchAfter,proof(502)));assert(!recovered.pending('refine'));
+ const interrupted=recovered.begin('refine',{id:'w'},s,600,true);recovered.observe({...s,coins:4900,refine:{w:2}},601);const resumed=new ResultLedger(root,0,602);resumed.observe(batchAfter,602);assert(resumed.pending('refine'));assert.equal(resumed.rows[0].id,interrupted.id);assert.equal(resumed.rows[0].cost.coins,300);assert(resumed.acknowledgeAcceptedSave(batchAfter,proof(602)));assert(!resumed.pending('refine'));
+ const cat={items:{w:{id:'w',slot:'weapon',tier:4,stats:{atk:10}},new:{id:'new',slot:'weapon',tier:4,stats:{atk:30}},a:{id:'a',slot:'armor',stats:{def:5}},b:{id:'b',slot:'boots',stats:{def:1}},c:{id:'c',slot:'boots',stats:{def:2}}},world:{MONSTERS:[{id:'boss',kind:'boss',level:80}],EQUIPMENT_SETS:{set:{pieces:['a','b'],bonus:{2:{hp:1000}}}}}};
+ const save={job:'knight',lv:80,equip:{weapon:'w',armor:'a',boots:'b'},refine:{w:10},weaponOpts:{w:[{k:'dmgPct',v:.1}]},sockets:{w:['boss']}};
+ assert(!gear.compare(save,cat,'new').upgrade,'refine/enchant/card weapon must not be replaced by a higher base stat');
+ assert(!gear.compare(save,cat,'c').upgrade,'small upgrade must not destroy a stronger set bonus');
+ const n=Date.now(),i={slot:0,status:'playing',lastSaveAt:n,lastSave:{hp:100,lv:80,equip:{weapon:'w',armor:'a',boots:'b',head:'h'},potions:20},teamPartyId:1,livePos:{room:'tw#1',x:0,z:0,at:n},credentials:{charName:'tank'}};
+ assert(check(i,{hp:'100 / 100',mp:'50 / 100'}, {left:1},n).ready);
+ assert(!check(i,{hp:'20 / 100',mp:'50 / 100'},{left:1},n).ready);
+ assert(!check(i,{hp:'100 / 100',mp:'50 / 100'},{left:0},n).ready);
+ assert(!check({...i,lastSaveAt:n-40000},{hp:'100 / 100',mp:'50 / 100'},null,n).ready);
+ const ally={...i,slot:1,vitals:{at:n,hp:.2},livePos:{room:'tw#1',x:5,z:0,at:n}},healer={...i,lastSave:{job:'lumenoracle'}};
+ assert.equal(tactics(healer,[healer,ally],n).action,'support');
+ assert.notEqual(tactics(healer,[healer,{...ally,livePos:{...ally.livePos,room:'tw#2'}}],n).action,'support');
+ assert.notEqual(tactics(healer,[healer,{...ally,teamPartyId:2}],n).action,'support');
+ const d=new DungeonLearning(root),team=[{slot:0,credentials:{charName:'tank'},lastSave:{lv:80}}];
+ d.observe(team,[{run:{id:10,floor:1,member:true,lives:3}}],n);d.observe(team,[{run:{id:10,floor:21,member:true,lives:1,done:'timeout'}}],n+60000);
+ d.reward(10,0,{floor:10,coins:2000},n);d.reward(10,0,{floor:10,coins:2000},n);assert.equal(d.data.runs[0].rewards.length,1);
+ assert.equal(d.priorities()[0].slot,0);assert.equal(d.choose([1,11,21],[0]).from,11);
+ d.observe(team,[{run:{id:11,floor:1,member:true,lives:3}}],n+70000);d.observe(team,[null],n+300001);assert.equal(d.data.runs[0].status,'connection_unknown');assert.equal(new DungeonLearning(root).data.runs.length,2);
+ console.log('PASS durable no-replay ledger, costs, upgraded weapon and set preservation, readiness, real party/range support, dungeon outcomes, conservative floor learning and reward dedup');
+}finally{const resolved=path.resolve(root);assert(resolved.startsWith(path.resolve(os.tmpdir())+path.sep));fs.rmSync(resolved,{recursive:true,force:true});}

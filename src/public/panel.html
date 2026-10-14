@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="th"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asteria Farm</title>
+<link rel="icon" href="/api/icon"><link rel="stylesheet" href="/team-map.css"><link rel="stylesheet" href="/reports-ui.css">
+<style>
+  :root{
+    --bg:#0b1117; --panel:#111a23; --panel2:#0e161e; --line:#1e2c39;
+    --tx:#dfe9f2; --dim:#7e93a6; --acc:#2ee59d; --acc2:#16c47f;
+    --warn:#f0b429; --err:#ff6b6b; --ok:#2ee59d;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Cascadia Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#13202c,transparent),var(--bg);
+       color:var(--tx);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);
+         background:rgba(10,16,22,.7);backdrop-filter:blur(6px);position:sticky;top:0;z-index:5}
+  header img{width:40px;height:40px;border-radius:9px;box-shadow:0 4px 14px rgba(46,229,157,.18)}
+  h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.01em}
+  h1 small{display:block;font-weight:400;color:var(--dim);font-size:12px;letter-spacing:.02em}
+  .dot{width:9px;height:9px;border-radius:50%;background:#3a4a58;flex:none}
+  .dot.on{background:var(--acc);box-shadow:0 0 10px var(--acc);animation:p 2s ease-in-out infinite}
+  .dot.stop{background:var(--warn)}
+  @keyframes p{50%{opacity:.45}}
+  main{max-width:1180px;margin:0 auto;padding:22px;display:grid;gap:18px}
+  section{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+          border-radius:14px;padding:18px}
+  h2{margin:0 0 14px;font-size:13px;font-weight:650;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:12px}
+  label{display:grid;gap:5px;font-size:12px;color:var(--dim)}
+  input,select{background:#0a1219;border:1px solid var(--line);border-radius:9px;color:var(--tx);
+               padding:9px 11px;font:inherit;font-size:13.5px;width:100%}
+  input:focus,select:focus{outline:none;border-color:var(--acc2);box-shadow:0 0 0 3px rgba(46,229,157,.12)}
+  .chk{display:flex;align-items:center;gap:9px;color:var(--tx);font-size:13px;cursor:pointer;user-select:none}
+  .chk input{width:auto;accent-color:var(--acc)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);
+         background:#16222d;color:var(--tx);padding:11px 20px;cursor:pointer;transition:.14s}
+  button:hover:not(:disabled){border-color:#2c4256;transform:translateY(-1px)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.go{background:linear-gradient(180deg,#2ee59d,#12b374);color:#04140d;border-color:#2ee59d}
+  button.stop{background:linear-gradient(180deg,#ff7b7b,#e04848);color:#210606;border-color:#ff7b7b}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .stat{background:#0a1219;border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+  .stat b{display:block;font-size:21px;font-family:var(--mono);font-weight:600;letter-spacing:-.02em}
+  .stat span{color:var(--dim);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+  .stat b.warn{color:var(--warn)} .stat b.bad{color:var(--err)}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+  th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;
+     letter-spacing:.07em;padding:7px 10px;border-bottom:1px solid var(--line)}
+  td{padding:7px 10px;border-bottom:1px solid #141f29;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .pill.playing{background:rgba(46,229,157,.14);color:var(--acc)}
+  .pill.booting,.pill.reloading,.pill.init,.pill.recycling,.pill.stopping{background:rgba(240,180,41,.14);color:var(--warn)}
+  .pill.unresponsive,.pill.closed,.pill.stopped{background:rgba(255,107,107,.14);color:var(--err)}
+  .pill.act{background:rgba(111,183,255,.14);color:#6fb7ff;margin-left:5px}
+  pre{background:#070d13;border:1px solid var(--line);border-radius:11px;padding:13px;
+      font-family:var(--mono);font-size:12px;line-height:1.55;max-height:290px;overflow:auto;
+      margin:0;white-space:pre-wrap;word-break:break-word;color:#a9c0d3}
+  .muted{color:var(--dim);font-size:12.5px}
+  .banner{border-radius:11px;padding:11px 14px;font-size:13px;display:none}
+  .banner.show{display:block}
+  .banner.err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+  .banner.info{background:rgba(46,229,157,.08);border:1px solid rgba(46,229,157,.3);color:#9ff0cd}
+  code{font-family:var(--mono);background:#0a1219;padding:1px 6px;border-radius:5px;font-size:12.5px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin:0 0 16px}
+  .tile{position:relative;background:#05090d;border:1px solid var(--line);border-radius:11px;overflow:hidden;
+        aspect-ratio:16/9;display:grid;place-items:center}
+  .tile img{width:100%;height:100%;object-fit:contain;display:block;background:#05090d}
+  .tile .ph{color:var(--dim);font-size:12px;text-align:center;padding:10px}
+  .tile .bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:9px;align-items:center;
+             padding:6px 9px;background:linear-gradient(transparent,rgba(3,7,11,.92));font-family:var(--mono);
+             font-size:11.5px;color:#cfe0ee}
+  .tile .bar b{color:var(--acc)}
+  .tile .badge{position:absolute;top:7px;left:7px;font-family:var(--mono);font-size:11px;font-weight:700;
+               background:rgba(3,7,11,.72);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+  .tile .fps{position:absolute;top:7px;right:7px;font-family:var(--mono);font-size:11px;font-weight:700;
+             border-radius:6px;padding:1px 7px;background:rgba(3,7,11,.72);border:1px solid var(--line)}
+  .tile .fps.ok{color:var(--acc)} .tile .fps.bad{color:var(--warn)}
+  .pend{background:rgba(240,180,41,.18);color:var(--warn);border-radius:5px;padding:1px 6px;font-weight:700}
+/* Text-first control panel. System fonts, no remote assets or animation. */
+:root{--bg:#0c1015;--panel:#13191f;--panel2:#13191f;--line:#27313b;--tx:#e7edf3;--dim:#94a4b4;--acc:#75dbb5;--acc2:#55c99e;--good:var(--acc)}
+body{background:var(--bg);font-size:14px;line-height:1.65}
+[hidden]{display:none!important}a{color:inherit;text-decoration:none}
+.sidebar{width:216px;position:fixed;inset:0 auto 0 0;background:#10151b;border-right:1px solid var(--line);padding:32px 18px;display:flex;flex-direction:column;z-index:10}
+.brand{display:flex;gap:12px;align-items:center;font-weight:750;letter-spacing:2px;font-size:17px;margin:0 10px 48px}.brand small{display:block;color:var(--dim);font-size:9px;letter-spacing:2px;margin-top:2px}.brand-mark{display:grid;place-items:center;border:1px solid #4b7a6a;background:#20372f;color:var(--acc);font:600 26px Georgia,serif;width:39px;height:43px;border-radius:10px}
+.nav-caption{color:#71818f;font-size:11px;padding:0 15px;margin-bottom:12px}.sidebar nav{display:grid;gap:6px}.nav-item{text-align:left;background:transparent;border-color:transparent;padding:11px 14px;color:var(--dim);font-size:13px;font-weight:500}.nav-item span{display:inline-block;width:25px;font-size:19px;vertical-align:middle}.nav-item.active{background:#20372f;color:#9beacb;border-color:#304c40}.nav-item:hover:not(:disabled){transform:none;background:#1a232b}.sidebar-foot{margin-top:auto;font-size:12px;color:#c0cbd4;padding:18px 10px 0;border-top:1px solid var(--line)}.sidebar-foot small{display:block;font-size:10px;color:var(--dim);margin:6px 0 0 15px}.local-dot{display:inline-block;width:6px;height:6px;background:var(--acc);border-radius:50%;margin-right:7px}
+.workspace{margin-left:216px;min-width:0}header{position:static;background:transparent;backdrop-filter:none;padding:20px 36px;justify-content:space-between;height:72px}.breadcrumb{font-size:12px;color:var(--dim)}.breadcrumb span{margin:0 14px;color:#4f606c}.breadcrumb b{color:var(--tx);font-weight:500}.connection{display:flex;align-items:center;gap:8px;font-size:12px}.connection b{font-weight:500}.dot.on{animation:none;box-shadow:none}.dot{width:7px;height:7px}
+main{max-width:1560px;padding:30px 36px;gap:20px}.page-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}.eyebrow{font:10px var(--mono);letter-spacing:2px;color:var(--acc)}h1{font-size:28px;font-weight:650;letter-spacing:-.5px;margin-top:7px}.page-heading p{font-size:13px;color:var(--dim);margin:5px 0 0}.run-controls{display:flex;gap:8px;flex-shrink:0}button{transition:none;border-radius:8px;font-size:13px;padding:9px 15px}button.go{background:#88e0bb;border-color:#88e0bb;color:#10231b}button.stop{background:#20191c;border-color:#573538;color:#f3acac}button:hover:not(:disabled){transform:none;filter:brightness(1.1)}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--acc);outline-offset:4px}button:disabled{opacity:.35}.view{display:grid;gap:20px;min-width:0}section{padding:22px;border-radius:12px;min-width:0;background:var(--panel)}h2{font-size:15px;color:var(--tx);letter-spacing:0;text-transform:none;font-weight:600}h3{font-size:14px;margin-top:24px}
+.overview-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric{padding:19px 20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-width:0}.metric>span{display:block;color:var(--dim);font-size:12px}.metric strong{display:block;margin:9px 0 5px;font:500 27px var(--mono);letter-spacing:-1px}.metric strong b{font-weight:500}.metric em{font:11px var(--mono);color:var(--dim);letter-spacing:0}.metric small{color:var(--dim);font-size:10px}.metric #sUp{font-size:22px;line-height:32px}.memory-track{height:3px;background:#26322f;border-radius:4px;margin-top:11px}.memory-track i{display:block;height:100%;background:var(--acc);border-radius:4px}.warn{color:var(--warn)!important}#ramNote:empty{display:none}#ramNote{margin:0;padding:0 4px}
+.fleet-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0 0 17px}.fleet-toolbar p{margin:0}.fleet-toolbar .chk{font-size:11px;color:var(--dim)}.fleet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.fleet-grid.stale{opacity:.6}.agent-card{border:1px solid #2b3842;background:#10161c;border-radius:10px;padding:19px;min-width:0;position:relative}.agent-card.attention{border-color:#68522f}.agent-head{display:flex;align-items:center;gap:10px;margin-bottom:17px}.agent-avatar{width:37px;height:40px;display:grid;place-items:center;flex-shrink:0;border-radius:9px;background:#20352e;color:#9ee1c6;font:600 15px var(--mono)}.agent-card:nth-child(3n+2) .agent-avatar{background:#29283d;color:#c2b8eb}.agent-card:nth-child(3n) .agent-avatar{background:#203341;color:#99c9e8}.agent-name{min-width:0;flex:1}.agent-name b{display:block;font-size:15px;overflow-wrap:anywhere}.agent-name small{display:block;color:var(--dim);font-size:10px}.agent-head .pill{font-size:10px;padding:2px 7px;white-space:nowrap}.agent-goal{min-height:73px}.agent-goal span{color:var(--dim);font-size:10px}.agent-goal h3{font-size:13px;margin:4px 0;line-height:1.6;color:#d9e7df;font-weight:500}.agent-location{font-size:11px;color:var(--dim);margin:12px 0 16px}.agent-location b{color:#bbc8d3;font-weight:500}.agent-metrics{display:grid;grid-template-columns:repeat(3,1fr);padding-top:13px;border-top:1px solid var(--line);gap:8px}.agent-metrics span{font-size:10px;color:var(--dim);display:block}.agent-metrics b{font:500 15px var(--mono)}.agent-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:15px;font-size:10px;color:var(--dim)}.detail-link{border:0;background:transparent;color:var(--acc);padding:0;font-size:11px}.empty-state{grid-column:1/-1;padding:36px;text-align:center;color:var(--dim)}.preview-options{margin:0 0 18px;color:var(--dim);font-size:11px}.technical{border-top:1px solid var(--line);margin-top:20px;padding-top:15px}.technical summary{font-size:12px;color:var(--dim);cursor:pointer}summary{cursor:pointer}.table-scroll{overflow-x:auto;max-width:100%;margin-top:16px}table{font-family:inherit;font-size:12px}td{padding:11px;white-space:normal;overflow-wrap:anywhere}th{font-family:inherit;white-space:nowrap;letter-spacing:0;font-size:11px}#view-plans table{min-width:850px}#view-plans section,#view-characters section,#view-accounts section{overflow:auto}#view-characters table{min-width:500px}.technical table{min-width:1300px}.stat b{font-size:18px}.stat span{letter-spacing:0}.stats{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}#charTabs button.on{background:#20372f;color:var(--acc);border-color:#467961}#log{max-height:65vh;font-size:11px;line-height:1.85}footer{display:flex;justify-content:space-between;gap:15px;font:10px var(--mono);color:#6d7e8c;padding:0 2px}footer span{font-family:system-ui;font-size:11px}
+@media(min-width:1500px){.fleet-grid{gap:18px}.agent-card{padding:23px}}
+@media(max-width:1150px){.sidebar{width:180px;padding:25px 12px}.workspace{margin-left:180px}main{padding:25px 22px}header{padding:18px 22px}.brand{font-size:14px;margin-left:4px}.brand small{font-size:8px}.fleet-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.page-heading{align-items:flex-start}h1{font-size:24px}}
+@media(max-width:700px){.sidebar{position:static;width:auto;padding:15px 16px;display:block;border-right:0;border-bottom:1px solid var(--line)}.brand{margin:0 0 15px;font-size:15px}.brand-mark{width:30px;height:32px;font-size:22px}.brand small,.nav-caption,.sidebar-foot{display:none}.sidebar nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.nav-item{white-space:nowrap;padding:8px 10px;font-size:12px}.nav-item span{display:none}.workspace{margin-left:0}header{height:53px;padding:12px 18px}main{padding:22px 16px;gap:16px}.page-heading{display:block}.run-controls{margin-top:16px}.run-controls button{flex:1}.overview-stats{gap:10px}.metric{padding:15px}.metric strong{font-size:24px}.metric #sUp{font-size:18px}.fleet-grid{grid-template-columns:1fr}section{padding:17px}.fleet-toolbar{align-items:flex-start;flex-direction:column}.agent-goal{min-height:0}.page-heading h1{font-size:25px}footer{flex-direction:column;gap:6px}.grid{grid-template-columns:1fr 1fr}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+
+  .exp-block{min-width:150px;margin:10px 0;color:var(--tx)}
+  .exp-label{display:flex;justify-content:space-between;gap:12px;font-size:12px;margin-bottom:5px}
+  .exp-track{height:9px;overflow:hidden;border-radius:20px;background:#233343}
+  .exp-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,#28b9d8,#79e8b9)}
+  .exp-block small{display:block;font-size:11px;color:var(--dim);margin-top:4px;white-space:normal}
+  .exp-block.exp-old .exp-fill{background:#73869a}
+  .exp-team{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .exp-team .exp-block{margin:0;padding:12px;border:1px solid var(--line);border-radius:10px}
+</style></head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#overview"><span class="brand-mark">A</span><span>ASTERIA<small>FARM CONTROL</small></span></a>
+  <span class="nav-caption">พื้นที่ควบคุม</span>
+  <nav aria-label="เมนูหลัก">
+    <button data-view="overview" class="nav-item active" aria-current="page"><span>▦</span> ภาพรวม</button>
+    <button data-view="map" class="nav-item"><span>⌖</span> แผนที่ทีม</button>
+    <button data-view="characters" class="nav-item"><span>♙</span> ตัวละคร</button>
+    <button data-view="plans" class="nav-item"><span>◇</span> แผนพัฒนา</button>
+    <button data-view="reports" class="nav-item"><span>↗</span> สรุปผลต่อชั่วโมง</button>
+    <button data-view="activity" class="nav-item"><span>≡</span> บันทึกการทำงาน</button>
+    <button data-view="settings" class="nav-item"><span>⚙</span> ตั้งค่าการเล่น</button>
+    <button data-view="accounts" class="nav-item"><span>⊞</span> บัญชีทีม</button>
+  </nav>
+  <div class="sidebar-foot"><span class="local-dot"></span> ทำงานบนเครื่องนี้<small>ข้อมูลสด · ไม่มีภาพสตรีม</small></div>
+</aside>
+<div class="workspace">
+<div style="padding:10px 22px;background:#20372f;border-bottom:1px solid #467961"><a href="http://127.0.0.1:4712/" style="color:#9ee1c6;text-decoration:none">เปิดเว็บรวมทีม Windows + tum · ทั้ง 6 ตัว ↗</a></div><header><div class="breadcrumb">พื้นที่ควบคุม <span>/</span> <b id="viewLabel">ภาพรวม</b></div><div class="connection"><span class="dot" id="dot"></span><b id="state">กำลังเชื่อมต่อ…</b></div></header>
+<main>
+  <div class="page-heading"><div><span class="eyebrow">ASTERIA / CONTROL CENTER</span><h1 id="pageTitle">ภาพรวมการทำงาน</h1><p id="pageSubtitle">ดูทั้งทีมในหน้าเดียว พร้อมเป้าหมายและสถานะล่าสุด</p></div><div class="run-controls"><button class="go" id="start" disabled>▶ เริ่มเล่น</button><button class="stop" id="stop" disabled>■ หยุดทั้งหมด</button></div></div>
+  <div class="banner" id="banner" role="status"></div>
+  <div id="view-overview" class="view"><div class="overview-stats">
+  <div class="metric"><span>ตัวละครที่กำลังเล่น</span><strong id="sWindows">–</strong><small>สถานะจากทั้งทีม</small></div>
+  <div class="metric"><span>หน่วยความจำว่าง</span><strong><b id="sFree">–</b> <em>MB</em></strong><small id="memoryHint">กำลังอ่านข้อมูลเครื่อง</small><div class="memory-track"><i id="memoryBar"></i></div></div>
+  <div class="metric"><span>FPS ต่ำสุดของจอที่เล่น</span><strong id="sFps">–</strong><small>ตั้งเป้า 30 · ควรอยู่เหนือ 20</small></div>
+  <div class="metric"><span>ระยะเวลารอบนี้</span><strong id="sUp">–</strong><small id="modeLabel">รายงานสถานะเป็นข้อความ</small></div>
+</div><p class="muted" id="ramNote"></p>  <section>
+    <h2>สถานะตัวละคร <span class="muted" id="snapAge" style="float:right;text-transform:none;letter-spacing:0"></span></h2>
+    <details class="preview-options"><summary>ภาพพรีวิว (ปิดในโหมด 6 จอ)</summary><div class="row" style="margin:12px 0">
+      <label class="chk"><input type="checkbox" id="showScreens"> แสดงภาพหน้าจอสด (โหมดประหยัดใช้รายงานข้อความ)</label>
+      <span class="muted" id="tileHint">ภาพอัปเดตประมาณวินาทีละครั้ง</span>
+    </div>
+    <div class="tiles" id="tiles"></div></details><div class="fleet-toolbar"><p class="muted">เป้าหมายล่าสุดของแต่ละตัวละคร</p><label class="chk"><input id="issuesOnly" type="checkbox"> เฉพาะจอที่ควรตรวจสอบ</label></div><div id="fleetCards" class="fleet-grid"><p class="muted">กำลังรับสถานะตัวละคร…</p></div><details class="technical"><summary>ดูตารางสถานะโดยละเอียด</summary><div class="table-scroll">
+    <table><thead><tr>
+      <th>จอ</th><th>สถานะ</th><th title="เป้าหมายที่สมองเกมเลือก - เอาเมาส์ชี้เพื่อดูเหตุผล">เป้าหมาย</th><th>Lv</th><th>อาชีพ</th><th>EXP</th><th>เหรียญ</th><th>แผนที่</th>
+      <th title="แต้มสถานะที่ยังไม่ได้ใช้">แต้ม</th><th title="แต้มสกิลที่ยังไม่ได้ใช้">สกิล</th>
+      <th>เควส</th><th>FPS</th><th>บันทึก</th><th>ไม่ขยับ</th><th>error</th>
+      <th title="จำนวนครั้งที่ถูกรี (ปิดแล้วเปิดเบราว์เซอร์ใหม่เพื่อคืนหน่วยความจำ)">รี</th>
+    </tr></thead><tbody id="rows"><tr><td colspan="16" class="muted">ยังไม่เริ่ม</td></tr></tbody></table></div></details>
+  </section></div>
+  <div id="view-map" class="view" hidden><section><div class="map-topline"><h2>ตำแหน่งสมาชิกในทีม</h2><span id="mapUpdated" class="muted">กำลังรับตำแหน่ง…</span></div><div class="map-layout"><div><div class="map-controls"><label>เลือกโซน<select id="mapRoom"><option value="town">Asteria Town</option></select></label><button id="mapUnfollow" disabled>เลิกติดตาม</button></div><div id="mapFollowing" class="map-follow">เลือกสมาชิกเพื่อติดตาม</div><div id="mapCanvas" class="map-canvas"></div><p id="mapBoundsNote" class="map-note"></p><div id="mapDetail" class="map-detail"></div></div><div><h2>สมาชิก · สีและหมายเลข</h2><div id="mapTeam" class="map-team"></div></div></div></section><section><h2>แผนที่โลก · เลือกโซนเพื่อดูตำแหน่ง</h2><p class="muted">ผังเส้นทางแบ่งตามภูมิภาค ไม่ใช่มาตราส่วนทางภูมิศาสตร์ · ตัวเลขคือหมายเลขจอ</p><div id="mapWorld" class="map-world"></div></section></div>
+  <div id="view-characters" class="view" hidden>  <section>
+    <h2>รายละเอียดรายตัว</h2>
+    <div id="charTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="charBody"><p class="muted">เลือกจอด้านบนเพื่อดูข้อมูลตัวละคร</p></div>
+  </section></div>
+  <div id="view-plans" class="view" hidden>  <section>
+    <h2>ทีม · กิลด์ · หอคอย</h2>
+    <div class="stats">
+      <div class="stat"><b id="tParty">–</b><span>สมาชิกปาร์ตี้</span></div>
+      <div class="stat"><b id="tGuild">–</b><span>กิลด์</span></div>
+      <div class="stat"><b id="tGuildLv">–</b><span>เลเวลกิลด์ (GP)</span></div>
+      <div class="stat"><b id="tTower">–</b><span>หอคอย (ชั้นสูงสุด)</span></div>
+    </div>
+    <p class="muted" id="tNote" style="margin:8px 0 0"></p>
+  </section>  <section>
+    <h2>แผนพัฒนาตัวละคร</h2>
+    <table><thead><tr>
+      <th>จอ</th><th>ตัวละคร</th><th>เป้าปีก (ขาดอะไร)</th><th>ตีบวกรอบถัดไป</th><th>สัตว์เลี้ยงใกล้สุด</th><th>เกียร์ที่ควรไปฟาร์ม</th>
+    </tr></thead><tbody id="planRows"><tr><td colspan="6" class="muted">กำลังโหลด…</td></tr></tbody></table>
+    <p class="muted" style="margin:8px 0 0">คำนวณจากตารางของเกมเอง (ไอเทม/สูตรคราฟ/ดรอปเทเบิล) — ตัวเลขเดียวกับที่ตัวควบคุมใช้ตัดสินใจ</p>
+  </section></div>
+  <div id="view-settings" class="view" hidden>  <section>
+    <h2>ตั้งค่าแล้วเริ่ม</h2>
+    <div class="grid">
+      <label>จำนวนจอ <input id="n" type="number" min="1" max="24" value="6"></label>
+      <label>รัศมีล่ามอน
+        <select id="radius"><option value="120" selected>ทั้งแผนที่ (120)</option>
+          <option value="28">กลาง (28)</option><option value="16">แคบ (16)</option><option value="8">แคบมาก (8)</option></select>
+      </label>
+      <label>ดื่มยาเมื่อ HP ต่ำกว่า
+        <select id="potpct"><option value="50" selected>50%</option><option value="70">70%</option>
+          <option value="35">35%</option><option value="25">25%</option></select>
+      </label>
+      <label>อาชีพที่เลือก (เรียงตามลำดับ)
+        <input id="job" value="ranger,mage,priest,knight,assassin,monk">
+      </label>
+      <label>แผนที่ล่าสำรอง <input id="huntmap" value="w1"></label>
+      <label>RAM ว่างขั้นต่ำต่อจอ (MB) <input id="minfree" type="number" value="800"></label>
+      <label>ปล่อยจอห่างกัน (วินาที) <input id="stagger" type="number" value="12"></label>
+      <label>แจ้งว่า "ติด" เมื่อไม่ขยับ (วินาที)
+        <input id="stuck" type="number" value="180"></label>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <label class="chk"><input type="checkbox" id="nodraw" checked> ประหยัดทรัพยากร · รายงานข้อความ</label>
+      <label class="chk"><input type="checkbox" id="headed"> เปิดหน้าต่างจริงให้ดู</label>
+      <label class="chk"><input type="checkbox" id="autoBuild" checked> ใช้แต้มสถานะ/สกิลอัตโนมัติ</label>
+      <p class="muted" id="healNote" style="margin:6px 0 0"></p>
+      <label class="chk"><input type="checkbox" id="god"> <b>โหมด 6 จอ</b> — ปิดภาพพรีวิว พร้อมระบบคืนหน่วยความจำ</label>
+    </div>
+    <p class="muted" style="margin:8px 0 0">
+      แต้มสถานะจะถูกเก็บไว้จนกว่าจะเลือกอาชีพ (การเปลี่ยนอาชีพไม่คืนแต้ม) แล้วจึงลงตามสัดส่วนที่เกมแนะนำไว้ให้แต่ละอาชีพ
+    </p>
+
+  </section><section><h2>เครื่องและเซิร์ฟเวอร์</h2><div class="stats"><div class="stat"><b id="sOnline">–</b><span>ผู้เล่นในเกม</span></div><div class="stat"><b id="sCache">–</b><span>แคชในเครื่อง (MB)</span></div><div class="stat"><b id="sBuild">–</b><span>เวอร์ชันเกม</span></div></div><p class="muted" id="hint">การตั้งค่ามีผลเมื่อเริ่มรอบใหม่</p></section></div>
+  <div id="view-accounts" class="view" hidden>  <section>
+    <h2>ทีมบอท <span class="muted" id="teamCount" style="float:right;text-transform:none;letter-spacing:0"></span></h2>
+    <div class="row" style="margin:-6px 0 12px">
+
+      <span class="muted">บัญชีจริงที่สมัครไว้ — เข้าเล่นเองได้ที่เว็บเกมด้วยชื่อ/รหัสนี้</span>
+    </div>
+    <table><thead><tr>
+      <th>ช่อง</th><th>ตัวละคร</th><th>อาชีพที่กำหนด</th><th>ชื่อตัวละคร</th><th>ตรวจล่าสุด</th>
+    </tr></thead><tbody id="teamRows"><tr><td colspan="5" class="muted">ยังไม่มีทีม — สร้างด้วย node scripts/make-team.js</td></tr></tbody></table>
+  </section></div>
+  <div id="view-reports" class="view" hidden><section><div class="report-controls"><h2>ทีม · ปาร์ตี้ · กิลด์</h2><span id="teamBrainFresh" class="muted">กำลังอ่านสมาชิก…</span></div><p id="teamMembershipSummary"></p><div class="event-item"><h3>นัดลงหอคอยทั้งทีม</h3><p id="teamTowerStatus" role="status">รอข้อมูลหอคอย…</p><p id="teamTowerQuota" class="muted"></p><p class="report-notice">รวมทีมในเมืองก่อนเปิด · หัวหน้าเข้าก่อน สมาชิกตามภายใน 2 นาที · สิทธิ์คงเหลือยึดเซิร์ฟเวอร์รายตัว</p></div><div class="table-scroll"><table class="report-table"><thead><tr><th>ตัวละคร / บทบาท</th><th>ในเกม</th><th>ปาร์ตี้</th><th>กิลด์</th><th>สมองรายตัว / เป้าหมาย</th></tr></thead><tbody id="teamBrainRows"></tbody></table></div><p class="report-notice">สมาชิกกับสถานะออนไลน์เป็นคนละข้อมูล · รายชื่อยึดข้อความล่าสุดจากเซิร์ฟเวอร์ หากเก่าเกิน 2 นาทีจะแสดงว่ารอยืนยันใหม่</p></section><section><div class="report-controls"><h2>ช่องสื่อสารของสมองทีม</h2><select id="teamChatSlot" aria-label="กรองการสื่อสาร"><option value="all">ทั้งทีม</option></select></div><p class="report-notice">รายงานแผน การมอบหมาย และผลที่ระบบส่งจริง · เป็นบันทึกการประสานงานภายใน ไม่ใช่แชตที่ส่งให้ผู้เล่นในเกม</p><div id="teamChatFeed" role="log" aria-live="polite" style="max-height:360px;overflow:auto"></div></section><section aria-labelledby="advisorHeading"><div class="report-controls"><h2 id="advisorHeading">สมอง AI อัตโนมัติ</h2><button id="toggleAutoBrain" type="button">กำลังอ่านโหมด AI…</button><button id="askAdvisor" type="button">ขอแผนจาก AI</button></div><p class="report-notice">ทบทวนทีมอัตโนมัติทุก 5 นาที · ผู้วางแผน AI และ Jev ตรวจแผนจากข้อมูลข้อความ · แต่ละตัวเลือกแผนหาเงิน/อุปกรณ์/คราฟ/ตีบวก/เก็บเลเวล · ตรวจ AUTO เมื่อหยุดคืบหน้าเกิน 2 นาที · ไม่ใช้ภาพ</p><p id="advisorStatus" role="status" aria-live="polite">กำลังอ่านสถานะ…</p><div id="autoBrainStatus" role="status"></div><div id="autoBrainHistory"></div><div id="advisorResult"></div></section><section><div class="report-controls"><h2>ผลรายตัว · ย้อนหลังสูงสุด 60 นาที</h2><span id="reportFresh" class="muted">กำลังรับข้อมูล…</span></div><p class="report-notice">ยอดสุทธิจากเซฟที่ส่งออกจากเกม ไม่ใช่ยอดรับรองจากเซิร์ฟเวอร์ · เหรียญรวมผลจากการซื้อและขายของ · อัตราต่อชั่วโมงเป็นค่าประมาณและแสดงเมื่อมีข้อมูลอย่างน้อย 1 นาที</p><div class="table-scroll"><table class="report-table"><thead><tr><th>ตัวละคร</th><th>EXP สุทธิ</th><th>EXP / ชม.</th><th>เหรียญสุทธิ</th><th>เหรียญ / ชม.</th><th>ตาย</th><th>เวลาเล่นที่วัดได้</th><th>เวลาขยับ</th><th>เวลาที่มีเซฟ</th></tr></thead><tbody id="reportRows"></tbody></table></div><p class="report-notice">สรุปเป็นช่วงละ 1 นาที · ไม่นับช่วงออฟไลน์หรือช่องว่างระหว่างเซฟเกิน 30 วินาที · เวลาเล่นนับจากตำแหน่งที่รับต่อเนื่องขณะยังมีชีวิต ส่วนเวลาขยับอาจรวมการเคลื่อนที่ระหว่างต่อสู้</p></section></div>
+  <div id="view-activity" class="view" hidden>  <section>
+    <div class="report-controls"><h2>กิจกรรมล่าสุด</h2><label>เลือกสมาชิก<select id="eventSlot"><option value="all">สมาชิกทั้งหมด</option></select></label><span id="eventFresh" class="muted">กำลังรับข้อมูล…</span></div><ol id="eventFeed" class="event-feed"></ol><details class="technical"><summary>บันทึกระบบฉบับเต็ม</summary><pre id="log">–</pre></details>
+  </section></div>
+  <footer>ASTERIA FARM <span>รายงานข้อความ · ไม่โหลดภาพเกมอัตโนมัติ</span></footer>
+</main></div>
+<script src="/team-map.js"></script><script src="/reports-ui.js"></script><script src="/ai-advisor-ui.js"></script><script src="/team-brain-ui.js"></script>
+<script>
+// 401 = the panel restarted or the password changed. Every fetch from here on would
+// return an error body that the page cannot tell apart from data, so it would freeze
+// on stale numbers forever - bounce to the login page instead.
+(() => {
+  const raw = window.fetch.bind(window);
+  window.fetch = async (...a) => {
+    const r = await raw(...a);
+    if (r && r.status === 401) { location.replace('/'); }
+    return r;
+  };
+})();
+
+const $ = id => document.getElementById(id);
+let activeView = 'overview';
+let latestStatus = null;
+// Verified against cache/fc1842a/asteria-online.io/asteria-world-system.js.
+// An unknown game build must not display a guessed level denominator.
+function expProgress(i,build){
+  const lv=i.lv,current=i.exp;
+  // Server-side progress uses the game's own expToNext from the LIVE build, so this works
+  // across game updates instead of silently emptying the bar on every new build hash.
+  if(Number.isFinite(i.expPct)) return {current,needed:i.expNeed,pct:Math.min(100,i.expPct),remaining:Math.max(0,(i.expNeed||0)-current),max:false};
+  if(build!=='fc1842a'||!Number.isInteger(lv)||lv<1||lv>120||!Number.isFinite(current)||current<0)return null;
+  if(lv===120)return {current,max:true,pct:100};
+  const base=Math.round(1.2*(100+40*lv+1.2*lv**2.6)*(1+Math.max(0,lv-15)/25));
+  const needed=lv<100?base:Math.round(base*(1.35+(lv-100)*.09));
+  return {current,needed,pct:Math.min(100,current/needed*100),remaining:Math.max(0,needed-current),max:false};
+}
+function expBar(i,label='EXP'){
+  const p=expProgress(i,latestStatus?.game?.build),num=n=>Math.round(n).toLocaleString('th-TH');
+  const old=!latestStatus?.running||i.status!=='playing'||i.lastSaveAgo==null||i.lastSaveAgo>30||!latestStatus?.snapshotAt||Date.now()-Date.parse(latestStatus.snapshotAt)>90000;
+  const title=escA(label)+' · Lv '+(Number.isInteger(i.lv)?i.lv:'–');
+  if(!p)return '<div class="exp-block"><div class="exp-label"><span>'+title+'</span><b>–</b></div><div class="exp-track"></div><small>รอข้อมูล EXP และสูตรของเกมรุ่นนี้</small></div>';
+  const value=p.max?'เลเวลสูงสุด':p.pct.toFixed(1)+'%';
+  const detail=p.max?'ถึงเลเวลสูงสุด 120 แล้ว':num(p.current)+' / '+num(p.needed)+' EXP · อีก '+num(p.remaining)+' EXP';
+  return '<div class="exp-block'+(old?' exp-old':'')+'"><div class="exp-label"><span>'+title+'</span><b>'+value+'</b></div><div class="exp-track" role="progressbar" aria-label="'+escA(label)+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+p.pct.toFixed(1)+'" aria-valuetext="'+detail+'"><div class="exp-fill" style="width:'+p.pct+'%"></div></div><small>'+detail+(old?' · ข้อมูลล่าสุดที่บันทึกไว้':'')+'</small></div>';
+}
+let busy = false;
+let formSynced = false;
+
+// Show what is actually running, so the form never disagrees with the live run.
+// Done once, and never while the user is typing in a field.
+function syncForm(o){
+  if (!o || formSynced) return;
+  const focused = document.activeElement && document.activeElement.tagName === 'INPUT';
+  if (focused) return;
+  const set = (id, v) => { if (v !== undefined && v !== null && v !== '' && $(id)) $(id).value = v; };
+  set('n', o.n); set('radius', o.radius); set('potpct', o.potpct);
+  set('job', o.job); set('huntmap', o.huntmap); set('minfree', o.minfree);
+  set('stagger', o.stagger); set('stuck', o.stuck);
+  if ($('nodraw')) $('nodraw').checked = !!o.nodraw;
+  if ($('headed')) $('headed').checked = !!o.headed;
+  formSynced = true;
+}
+
+function fmtUptime(s){
+  if(!s) return '–';
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), ss = s%60;
+  return h ? h+' ชม. '+m+' น.' : m ? m+' น. '+ss+' วิ' : ss+' วิ';
+}
+function pill(st){ const names = {playing:'กำลังเล่น',booting:'กำลังเข้าเกม',recycling:'คืนหน่วยความจำ',reloading:'กำลังโหลดใหม่',init:'เตรียมเริ่ม',stopping:'กำลังหยุด',stopped:'หยุดแล้ว',closed:'ปิดแล้ว',unresponsive:'ไม่ตอบสนอง'}; return '<span class="pill '+escA(st||'')+'">'+escA(names[st]||st||'รอข้อมูล')+'</span>'; }
+const escA = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function goalCell(i){
+  if (!i.goal) return '–';
+  const t = escA(i.goal.reason || i.goal.label || '');
+  const mark = i.goal.from === 'team' ? '👥 ' : '';
+  return '<b title="'+t+'" style="cursor:help">'+mark+escA(i.goal.label || i.goal.kind)+'</b>';
+}
+
+async function refresh(){
+  if (document.hidden) return;
+  let s;
+  try { s = await (await fetch('/api/status')).json(); }
+  catch(e){ $('state').textContent = 'ขาดการเชื่อมต่อ'; $('dot').className = 'dot stop'; $('fleetCards').classList.add('stale'); $('snapAge').textContent = 'เชื่อมต่อไม่ได้ · แสดงข้อมูลครั้งล่าสุด'; return; }
+
+  $('dot').className = 'dot ' + (s.running ? 'on' : 'stop');
+  $('state').textContent = s.running ? 'กำลังเล่น' : (s.stopping ? 'กำลังปิด…' : 'หยุดอยู่');
+  syncForm(s.options);
+
+  const freeEl = $('sFree');
+  freeEl.textContent = s.host.freeMb.toLocaleString();
+  // Colour the RAM number against the recycler's own threshold, so "is this normal?" does
+  // not need a cross-read of the log.
+  const below = s.recycle && s.recycle.belowMb;
+  freeEl.className = below && s.host.freeMb < below ? 'warn' : '';
+  const currentRun = !s.running || (s.snapshotAt && new Date(s.snapshotAt).getTime() >= s.startedAt);
+  $('sWindows').textContent = (s.running && currentRun ? (s.instances||[]).filter(i=>i.status==='playing').length : 0) + ' / ' + (s.options? s.options.n : 0);
+  $('sOnline').textContent = s.game ? s.game.online : '–';
+  $('sUp').textContent = fmtUptime(s.uptimeSec);
+  $('sCache').textContent = s.cache.mb.toLocaleString();
+  $('sBuild').textContent = s.game ? s.game.build : '–';
+
+  // One line about the RAM governor: when it is hunting for a victim and when it last
+  // recycled. Empty when quiet, or when the running supervisor predates the field.
+  if (s.recycle){
+    const bits = [];
+    if (below && s.host.freeMb < below) bits.push('RAM ต่ำกว่าเกณฑ์ ' + below.toLocaleString() + ' MB — กำลังเฝ้ารีจอทีละจอ');
+    if (s.recycle.lastAt){
+      const agoMin = Math.round((Date.now() - s.recycle.lastAt) / 60000);
+      bits.push('รีจอล่าสุด ' + (agoMin < 1 ? 'ไม่ถึง 1 นาที' : agoMin + ' นาที') + 'ที่แล้ว');
+    }
+    $('ramNote').textContent = bits.join(' · ');
+  } else $('ramNote').textContent = '';
+
+  const rows = currentRun ? (s.instances||[]) : [];
+  lastInstances = rows;
+  renderFleet(s);
+  // Say WHY a window is not being recycled: mid-chores and mid-dungeon windows are deferred
+  // by the RAM governor (see supervisor.js), so show that state next to the status pill.
+  const actPill = i => i.choresBusy
+    ? '<span class="pill act" title="กำลังทำธุระในเมือง — recycler เลี่ยงจอนี้จนกว่าจะเสร็จ">ทำธุระ</span>'
+    : (/^(tw|dx)/.test(i.mapId || '')
+      ? '<span class="pill act" title="อยู่ในดัน (หอคอย/ริฟต์) — recycle ตอนนี้จะเสียรอบ">ในดัน</span>'
+      : '');
+  $('rows').innerHTML = rows.length ? rows.map(i=>{
+    const exp = expBar(i);
+    const fps = i.fps ? i.fps : '–';
+    // Unspent points are wasted power: flag them so they are impossible to miss.
+    const pts = (i.pts === undefined || i.pts === null) ? '–'
+      : (i.pts > 0 ? '<span class="pend">'+i.pts+'</span>' : '0');
+    const sk = (i.skPts === undefined || i.skPts === null) ? '–'
+      : (i.skPts > 0 ? '<span class="pend">'+i.skPts+'</span>' : '0');
+    return '<tr><td>'+i.slot+'</td><td>'+pill(i.status)+actPill(i)+'</td><td>'+goalCell(i)+'</td><td>'+(i.lv??'–')+'</td><td>'+
+      (i.job??'–')+(i.jobLv?' <small style="color:var(--dim)">J'+i.jobLv+'</small>':'')+'</td><td>'+exp+'</td><td>'+
+      (i.coins??'–')+'</td><td>'+(i.mapId??'–')+'</td><td>'+pts+'</td><td>'+sk+'</td><td>'+
+      (i.boardQuest??'–')+'</td><td>'+fps+'</td><td>'+
+      (i.lastSaveAgo===null?'–':i.lastSaveAgo+' วิ')+'</td><td>'+
+      (i.noProgressFor===null?'–':i.noProgressFor+' วิ')+'</td><td>'+(i.errors??0)+'</td><td>'+
+      (i.recycles || '–')+'</td></tr>';
+  }).join('') : '<tr><td colspan="16" class="muted">ยังไม่เริ่ม</td></tr>';
+
+  renderTiles(rows);
+
+  // Say how fresh the table is - a stalled child leaves the last snapshot behind, and a
+  // silently stale table would read as "everything is fine".
+  if (!currentRun) {
+    $('snapAge').textContent = 'รอรายงานจากรอบใหม่';
+  } else if (s.snapshotAt){
+    const age = Math.round((Date.now() - new Date(s.snapshotAt).getTime())/1000);
+    $('snapAge').textContent = age < 90 ? 'อัปเดต ' + age + ' วิที่แล้ว' : 'ข้อมูลเก่า ' + age + ' วิ';
+    $('snapAge').style.color = age < 90 ? '' : 'var(--warn)';
+  } else $('snapAge').textContent = '';
+
+  $('start').disabled = busy || s.running;
+  $('stop').disabled  = busy || !s.running;
+
+  if (s.error){ showBanner(s.error,'err'); }
+  else if (s.stopping){ showBanner('กำลังปิดทุกจออย่างเรียบร้อย…','info'); }
+  else if ($('banner').textContent.startsWith('กำลังปิด')) { hideBanner(); }
+}
+
+function showBanner(msg, kind){
+  const b = $('banner'); b.className = 'banner show ' + kind; b.textContent = msg;
+}
+function hideBanner(){ $('banner').className = 'banner'; }
+
+/* ---- the bot team ---------------------------------------------------------- */
+let teamCache = null;
+
+async function panelControl(route,body={}){const h=await(await fetch('/api/panel-health',{cache:'no-store'})).json();if(h.service!=='asteria-panel')throw Error('ยืนยัน controller ไม่ได้');let token=null;if(Number(h.version)>=15){const t=await fetch('/api/control-token',{cache:'no-store'});if(!t.ok)throw Error('ยืนยันสิทธิ์ควบคุมไม่ได้');token=(await t.json()).token;}else if(h.loadedControllerRevision!=='6764094f9dce7fe4156c110d77674c0b1e83f7cbf494f789ccfd723fb4127d35')throw Error('controller เดิมยังไม่รองรับ');return fetch(route,{method:'POST',headers:{'Content-Type':'application/json',...(token?{'X-Asteria-Control':token}:{})},body:JSON.stringify(body)});}
+async function refreshTeam(){
+  if (activeView !== 'accounts' || document.hidden) return;
+  try {const h=await(await fetch('/api/panel-health')).json();if(Number(h.version)>=15)teamCache=await(await fetch('/api/team')).json();else{const s=await(await fetch('/api/status')).json();teamCache={file:'ทีมจากสถานะเกม',members:(s.instances||[]).map(m=>({slot:m.slot,charName:m.char,job:m.job,verifiedAt:m.lastSaveAt}))};}} catch { return; }
+  const rows = teamCache.members || [];
+  $('teamCount').textContent = rows.length ? (rows.length + ' บัญชี · ' + teamCache.file) : '';
+  $('teamRows').innerHTML = rows.length ? rows.map(m => {
+    const when = m.verifiedAt ? new Date(m.verifiedAt).toLocaleString('th-TH', { hour12:false }) : '–';
+    const job = m.job ? '<b>' + m.job + '</b>' : '<span class="muted">–</span>';
+    const cn = m.charName ? '<b>' + m.charName + '</b>' : '<span class="muted">–</span>';
+    return '<tr><td>' + m.slot + '</td><td><b>' + String(m.charName||('ช่อง '+m.slot)).replace(/&/g,'&amp;').replace(/</g,'&lt;') +
+      '</b></td><td>' + job + '</td><td>' + cn + '</td><td>' + when + '</td></tr>';
+  }).join('') : '<tr><td colspan="5" class="muted">ยังไม่มีทีม — สร้างด้วย node scripts/make-team.js</td></tr>';
+}
+
+
+
+/* ---- live screen tiles ---------------------------------------------------- */
+// The farm writes one JPEG per window into logs/frames/ (about 1/s) and we serve it here.
+// Tiles are built once and only their contents are updated, so the grid never flickers.
+const tiles = {};              // slot -> { wrap, img, badge, fps, bar, ph }
+let frameTick = 0;
+let lastInstances = [];
+
+function renderTiles(rows){
+  const wrap = $('tiles');
+  const show = $('showScreens').checked;
+  wrap.style.display = show ? '' : 'none';
+  $('tileHint').textContent = show
+    ? 'ภาพอัปเดตประมาณวินาทีละครั้ง · FPS ต่ำกว่า 20 เกมจะเดินช้าลง'
+    : 'ปิดอยู่ — ไม่มีการดึงภาพ';
+  if (!show) return;
+
+  const slots = rows.map(r => r.slot);
+  Object.keys(tiles).forEach(k => { if (!slots.includes(+k)) { tiles[k].wrap.remove(); delete tiles[k]; } });
+
+  rows.forEach(i => {
+    let t = tiles[i.slot];
+    if (!t){
+      const d = document.createElement('div');
+      d.className = 'tile';
+      d.innerHTML = '<div class="ph">กำลังรอภาพ…</div>' +
+        '<span class="badge">จอ ' + i.slot + '</span><span class="fps">–</span><div class="bar"></div>';
+      wrap.appendChild(d);
+      t = tiles[i.slot] = { wrap: d, img: null, badge: d.querySelector('.badge'),
+        fps: d.querySelector('.fps'), bar: d.querySelector('.bar'), ph: d.querySelector('.ph') };
+    }
+    // Same deferral state as the table: 🧹 mid-chores, 🏰 in a dungeon run — both mean the
+    // recycler will pick another window.
+    const actChip = i.choresBusy ? '🧹' : (/^(tw|dx)/.test(i.mapId || '') ? '🏰' : '');
+    t.badge.textContent = 'จอ ' + i.slot + (actChip ? ' ' + actChip : '');
+    t.badge.title = i.choresBusy ? 'กำลังทำธุระในเมือง — recycler เลี่ยงจอนี้'
+      : (actChip ? 'อยู่ในดัน (หอคอย/ริฟต์) — recycle ตอนนี้จะเสียรอบ' : '');
+    t.bar.innerHTML = '<b>Lv ' + (i.lv ?? '–') + '</b><span>' + (i.mapId ?? '–') + '</span>' +
+      '<span>💰 ' + (i.coins ?? '–') + '</span><span>🧪 ' + (i.potions ?? '–') + '</span>' +
+      (i.recycles ? '<span title="ถูกรีมาแล้ว ' + i.recycles + ' ครั้ง">♻ ' + i.recycles + '</span>' : '') +
+      '<span>' + (i.status || '') + '</span>';
+    const f = i.fps || 0;
+    t.fps.textContent = f ? f + ' FPS' : '–';
+    t.fps.className = 'fps ' + (f >= 20 ? 'ok' : f ? 'bad' : '');
+  });
+}
+
+function refreshFrames(){
+  if (!$('showScreens').checked || document.hidden) return;
+  frameTick++;
+  lastInstances.forEach(i => {
+    const t = tiles[i.slot];
+    if (!t) return;
+    // Always ask for the frame and let the server decide: it answers 204 when the file is
+    // stale, which lands in onerror. Gating on the snapshot's frameAt instead would be
+    // wrong - status.json is only rewritten every 30s, so that timestamp is usually stale
+    // even while frames are arriving every second.
+    const url = '/api/frame?slot=' + i.slot + '&t=' + frameTick;
+    const next = new Image();
+    next.onload = () => {
+      if (!t.img){
+        const img = document.createElement('img');
+        img.alt = '';
+        t.img = img;
+        t.wrap.insertBefore(img, t.wrap.firstChild);
+      }
+      t.img.src = url;                       // preloaded, so the tile never flashes
+      t.ph.style.display = 'none';
+    };
+    next.onerror = () => {
+      if (t.img){ t.img.remove(); t.img = null; }
+      t.ph.style.display = '';
+      t.ph.textContent = i.status === 'playing' ? 'กำลังรอภาพ…' : 'จอนี้ยังไม่ทำงาน';
+    };
+    next.src = url;
+  });
+}
+
+$('showScreens').addEventListener('change', () => {
+  try { localStorage.setItem('asteriaFarm.showScreens', $('showScreens').checked ? '1' : '0'); } catch {}
+  renderTiles(lastInstances);
+  refreshFrames();
+});
+try {
+  const v = localStorage.getItem('asteriaFarm.showScreens');
+  if (v === '1') $('showScreens').checked = true;
+} catch {}
+
+async function refreshLog(){
+  if (activeView !== 'activity' || document.hidden) return;
+  try {
+    const r = await (await fetch('/api/log?tail=140')).json();
+    const el = $('log');
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+    el.textContent = r.text || '–';
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  } catch {}
+}
+
+$('start').addEventListener('click', async () => {
+  busy = true; hideBanner(); $('start').disabled = true;
+  const body = {
+    n: +$('n').value, nodraw: $('nodraw').checked, headed: $('headed').checked,
+    autoBuild: $('autoBuild').checked,
+    job: $('job').value.trim(), huntmap: $('huntmap').value.trim(),
+    radius: $('radius').value, potpct: $('potpct').value,
+    stuck: $('stuck').value, minfree: $('minfree').value, stagger: $('stagger').value,
+    god: $('god') ? $('god').checked : false,
+  };
+  try {
+    const r = await (await panelControl('/api/start',body)).json();
+    if (!r.ok) showBanner(r.error || 'เริ่มไม่สำเร็จ', 'err');
+    else showBanner('เริ่มแล้ว ' + body.n + ' จอ — ดูความคืบหน้าด้านล่างได้เลย', 'info');
+  } catch(e){ showBanner('เริ่มไม่สำเร็จ: ' + e.message, 'err'); }
+  busy = false; refresh();
+});
+
+$('stop').addEventListener('click', async () => {
+  busy = true; $('stop').disabled = true;
+  showBanner('กำลังปิดทุกจอ… (อาจใช้เวลาถึง 25 วินาที)', 'info');
+  try { await panelControl('/api/stop'); } catch {}
+  busy = false; hideBanner(); refresh();
+});
+
+refresh();
+async function refreshPlan(){
+  if (activeView !== 'plans' || document.hidden) return;
+  try{
+    const p = await (await fetch('/api/plan')).json();
+
+    const party = p.party, guild = p.guild, tower = p.tower;
+    const $id = id => document.getElementById(id);
+    $id('tParty').textContent = party && party.members ? (party.members.length + ' · ' + (party.leader || '–')) : '–';
+    $id('tGuild').textContent = guild ? (guild.name + ' · ' + (guild.members || []).length + '/' + (guild.cap || '?')) : 'ยังไม่มีกิลด์';
+    $id('tGuildLv').textContent = guild && guild.lv != null ? ('Lv ' + guild.lv) : '–';
+    $id('tTower').textContent = tower && tower.run ? ('ชั้น ' + tower.run.floor + ' / best ' + (tower.best ?? '–'))
+      : (tower && tower.best != null ? ('best ' + tower.best) : (tower ? 'เปิดรอบใหม่' : '–'));
+    const bits = [];
+    if (party && party.missing && party.missing.length) bits.push('ปาร์ตี้ขาด: ' + party.missing.join(', '));
+    if (tower && tower.left !== undefined) bits.push('หอคอยเหลือ ' + tower.left + ' รอบวันนี้');
+    $id('tNote').textContent = bits.join(' · ');
+
+    const rows = (p.rows || []).map(r => {
+      const wing = r.wing
+        ? (r.wing.levelOk ? 'ยังไม่ครบ' : ('ต้อง Lv ' + r.wing.reqLv)) + ' · ' + (r.wing.missing || []).join(', ')
+        : 'ไม่มีสายปีก';
+      const refine = r.refine && r.refine.doable
+        ? (r.refine.next || []).join(', ') || 'ไม่มีที่ทำได้'
+        : '–';
+      const blocked = r.refine && r.refine.blocked && r.refine.blocked.length ? ' <small style="color:var(--dim)">(ขาด ' + r.refine.blocked.join(', ') + ')</small>' : '';
+      const pet = r.pet ? (r.pet.unlocked ? '✓ ' + r.pet.name : r.pet.name + ' ' + r.pet.kills + '/' + r.pet.need + ' (' + r.pet.pct + '%)') : '–';
+      const gear = (r.gear || []).join('<br>') || '–';
+      return '<tr><td>' + r.slot + '</td><td>' + (r.char || '–') + ' <small style="color:var(--dim)">Lv' + r.lv + ' ' + r.job + '</small></td>'
+        + '<td>' + wing + '</td><td>' + refine + blocked + '</td><td>' + pet + '</td><td><small>' + gear + '</small></td></tr>';
+    });
+    document.getElementById('planRows').innerHTML = rows.length
+      ? rows.join('')
+      : '<tr><td colspan="6" class="muted">ยังไม่มีข้อมูล — เริ่มฟาร์มก่อน</td></tr>';
+  }catch(e){
+    document.getElementById('planRows').innerHTML = '<tr><td colspan="6" class="muted">โหลดแผนไม่ได้: ' + e.message + '</td></tr>';
+  }
+}
+
+let charSlot = null;
+
+function charStat(label, value){
+  return '<div class="stat"><b>' + value + '</b><span>' + label + '</span></div>';
+}
+
+function fmtStats(st){
+  if(!st) return '–';
+  const order = ['str','agi','vit','int','dex','luk'];
+  return order.filter(k => st[k] != null).map(k => k.toUpperCase() + ' ' + st[k]).join(' · ');
+}
+
+function fmtItemStats(st){
+  if(!st) return '';
+  return Object.entries(st).map(([k,v]) => {
+    const pct = ['crit','spd','damageReduction','healBonus','dmgPct','aspdPct','critDmg','bossDmg'].includes(k);
+    return k.replace(/^st_/,'').toUpperCase() + ' ' + (pct ? Math.round(v*100)+'%' : (v>0?'+':'')+v);
+  }).join(' · ');
+}
+
+async function renderChar(slot){
+  charSlot = slot;
+  const tabs = document.getElementById('charTabs');
+  tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.slot === slot));
+  const box = document.getElementById('charBody');
+  if (box.dataset.slot !== String(slot)) box.innerHTML = '<p class="muted">กำลังโหลด…</p>';
+  box.dataset.slot = slot;
+  try{
+    const c = await (await fetch('/api/char?slot=' + slot)).json();
+    if (charSlot !== slot) return;
+    if(!c.ok){ box.innerHTML = '<p class="muted">' + (c.error || 'ไม่มีข้อมูล') + '</p>'; return; }
+
+    const p = c.promote || {};
+    const promoteLine = p.to
+      ? (p.ready
+          ? '<b style="color:var(--good)">พร้อมเลื่อนขั้นเป็น ' + p.to + '</b> — กดที่เมนูสกิลในเกม แล้วระบบจะเลื่อนให้อัตโนมัติ'
+          : 'เลื่อนขั้นเป็น ' + p.to + ' เมื่อ Job ' + p.needJobLv + ' + Lv ' + p.needLv + ' (ตอนนี้ Job ' + (c.jobLv||0) + ' · Lv ' + (c.lv||0) + ')')
+      : 'คลาสนี้ไม่มีขั้นถัดไป';
+
+    const statCards = [
+      charStat('Lv', c.lv ?? '–'), charStat('Job Lv', c.jobLv ?? '–'),
+      charStat('เหรียญ', (c.coins||0).toLocaleString()), charStat('โพชั่น', c.potions ?? '–'),
+      charStat('Guild Token', c.tokens ?? '–'), charStat('Rune Dust', c.runeDust ?? '–'),
+      charStat('แต้มสถานะค้าง', c.pts ?? '–'), charStat('แต้มสกิลค้าง', c.skPts ?? '–'),
+    ].join('');
+
+    const gear = (c.equip || []).map(e =>
+      '<tr><td>' + e.slot + '</td><td>' + e.name + (e.refine ? ' <b style="color:var(--good)">+' + e.refine + '</b>' : '') +
+      '</td><td>T' + e.tier + '</td><td>' + e.rarity + '</td><td><small>' + fmtItemStats(e.stats) + '</small></td></tr>').join('');
+
+    const skills = (c.skills || []).map(s =>
+      '<tr><td>' + s.name + '</td><td>' + s.lv + (s.max ? '/' + s.max : '') + '</td><td><small>' + (s.desc || '') + '</small></td></tr>').join('');
+
+    const pets = (c.pets || []).map(p =>
+      '<tr><td>' + p.monster + ' <small style="color:var(--dim)">Lv' + p.lv + '</small></td><td>' + p.kills + '/' + p.need +
+      '</td><td>' + p.progressPct + '%</td><td>' + (p.unlocked ? '✓ ปลดล็อกแล้ว' : (p.remaining + ' ตัว')) + '</td><td><small>' + JSON.stringify(p.firstTier||{}) + '</small></td></tr>').join('');
+
+    const bag = (c.bag || []).map(b => b.name + (b.n > 1 ? ' ×' + b.n : '')).join(' · ') || 'ว่าง';
+
+    box.innerHTML =
+      '<div class="stats" style="margin-bottom:10px">' + statCards + '</div>' + expBar({...c,status:lastInstances.find(i=>i.slot===slot)?.status,lastSaveAgo:lastInstances.find(i=>i.slot===slot)?.lastSaveAgo}) +
+      '<p class="muted" style="margin:0 0 4px"><b>ค่าสถานะส่วนตัว:</b> ' + fmtStats(c.stats) + '</p>' +
+      '<p class="muted" style="margin:0 0 4px"><b>แผนที่:</b> ' + (c.mapId || '–') + ' · <b>ของในกระเป๋า:</b> ' + bag + '</p>' +
+      '<p class="muted" style="margin:0 0 10px"><b>การอัพขั้น:</b> ' + promoteLine + '</p>' +
+      (c.goal ? '<h3>เป้าหมายตอนนี้ (สมองเกม)</h3><p class="muted" style="margin:0 0 10px"><b>' + escA(c.goal.label) + '</b>' +
+        (c.goal.mapName ? ' · ' + escA(c.goal.mapName) : '') + '<br><small>' + escA(c.goal.reason || '') + '</small></p>' : '') +
+      (c.learned && c.learned.maps && c.learned.maps.length
+        ? '<h3>สิ่งที่วัดได้เอง</h3><p class="muted" style="margin:0 0 10px">' +
+          c.learned.maps.map(m => escA(m.mapId) + ': ' + m.expPerHour.toLocaleString() + ' EXP/ชม. (' + m.minutes + ' นาที)').join(' · ') +
+          ' · เก็บสถิติการฆ่าแล้ว ' + c.learned.killsObserved.toLocaleString() + ' ตัว</p>' : '') +
+      '<h3>อุปกรณ์ที่สวม (' + (c.equip||[]).length + ')</h3>' +
+      '<table><thead><tr><th>ช่อง</th><th>ไอเทม</th><th>Tier</th><th>ระดับ</th><th>ค่าสถานะ</th></tr></thead><tbody>' + (gear || '<tr><td colspan="5" class="muted">ไม่มี</td></tr>') + '</tbody></table>' +
+      '<h3>สกิลที่เรียนแล้ว (' + (c.skills||[]).length + ')</h3>' +
+      '<table><thead><tr><th>สกิล</th><th>ระดับ</th><th>ผล</th></tr></thead><tbody>' + (skills || '<tr><td colspan="3" class="muted">ยังไม่มี</td></tr>') + '</tbody></table>' +
+      '<h3>สัตว์เลี้ยง — ใกล้ปลดล็อก</h3>' +
+      '<table><thead><tr><th>มอน</th><th>ฆ่าได้</th><th>คืบหน้า</th><th>เหลือ</th><th>โบนัสขั้นแรก</th></tr></thead><tbody>' + (pets || '<tr><td colspan="5" class="muted">ไม่มีข้อมูล</td></tr>') + '</tbody></table>' +
+      (c.wing ? '<h3>เป้าปีก</h3><p class="muted">' + c.wing.name + ' (T' + c.wing.tier + ') · ต้อง Lv ' + c.wing.reqLv +
+        (c.wing.levelOk ? ' ✓' : ' ✗') + ' · ต้อง ' + (c.wing.coinsNeeded||0).toLocaleString() + ' Copper<br><small>' +
+        (c.wing.missing || []).join(' · ') + '</small></p>' : '') +
+      (c.lastChore ? '<h3>chores ล่าสุด</h3><p class="muted">' + (c.lastChore.did || []).join(', ') + '</p>' : '');
+  }catch(e){
+    box.innerHTML = '<p class="muted">โหลดไม่ได้: ' + e.message + '</p>';
+  }
+}
+
+async function refreshCharTabs(){
+  if (activeView !== 'characters' || document.hidden) return;
+  try{
+    const st = await (await fetch('/api/status')).json();
+    const tabs = document.getElementById('charTabs');
+    const live = (st.instances || []).filter(i => i && i.char);
+    const want = live.map(i => i.slot).join(',');
+    if(tabs.dataset.slots !== want){
+      tabs.dataset.slots = want;
+      tabs.innerHTML = live.map(i =>
+        '<button class="cta small" data-slot="' + i.slot + '">จอ ' + i.slot + ' · ' + i.char + '</button>').join('');
+      tabs.querySelectorAll('button').forEach(b =>
+        b.addEventListener('click', () => renderChar(+b.dataset.slot)));
+      if(live.length && (charSlot === null || !live.some(i => i.slot === charSlot))) renderChar(live[0].slot);
+    }
+    if(charSlot !== null) renderChar(charSlot);
+  }catch(e){ /* the overview already reports failures */ }
+}
+
+async function applyGodDefault(){
+  if (document.hidden) return;
+  try{
+    const st = await (await fetch('/api/status')).json();
+    const box = document.getElementById('god');
+    if(box && st.godDefault && !box.dataset.touched) { box.checked = true; document.getElementById('n').value = st.countDefault || 6; }
+    if(st.federatedDefault) { document.getElementById('n').max=st.countDefault; }
+    const note = document.getElementById('healNote');
+    if(note) note.textContent = st.autoRestart
+      ? 'ระบบฟื้นตัวเอง: เปิด — ถ้าฟาร์มตายหรือค้างเกิน 4 นาที จะเริ่มใหม่ให้อัตโนมัติ (สูงสุด 20 ครั้ง)'
+      : 'ระบบฟื้นตัวเอง: ปิด (--no-autorestart)';
+  }catch(e){}
+}
+document.addEventListener('click', e => {
+  if(e.target && e.target.id === 'god') e.target.dataset.touched = '1';
+}, true);
+
+setInterval(refresh, 3000);
+applyGodDefault();
+setInterval(applyGodDefault, 15000);
+refreshPlan();                 // once on load, so the cards are not blank for the first 10s
+refreshCharTabs();
+setInterval(refreshPlan, 10000);
+setInterval(refreshCharTabs, 5000);
+setInterval(refreshLog, 4000);
+setInterval(refreshFrames, 1400);          // preview frames: ~1/s, only while the tab is visible
+setInterval(refreshTeam, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { refresh(); refreshFrames(); } });
+// Page navigation and text-only overview. All figures come from /api/status.
+const viewInfo = {
+  reports:['สรุปผลต่อชั่วโมง','ผลการเล่นของแต่ละตัว','เปรียบเทียบผลสุทธิ จำนวนตาย และเวลาที่วัดได้จริง'],
+  map:['แผนที่ทีม','ทีมอยู่ที่ไหน','ตำแหน่งจากเกม · อัปเดตทุก 2 วินาทีเฉพาะตอนเปิดดู · ไม่ส่งภาพ'],
+  overview:['ภาพรวม','ภาพรวมการทำงาน','ดูทั้งทีมในหน้าเดียว พร้อมเป้าหมายและสถานะล่าสุด'],
+  characters:['ตัวละคร','รายละเอียดตัวละคร','อุปกรณ์ สกิล และความคืบหน้าของสมาชิกในทีม'],
+  plans:['แผนพัฒนา','ก้าวต่อไปของทีม','เป้าหมายไอเทม การอัปเกรด และความพร้อมของปาร์ตี้'],
+  activity:['บันทึกการทำงาน','ความเคลื่อนไหวล่าสุด','ติดตามสิ่งที่ระบบทำและเหตุการณ์ที่ควรตรวจสอบ'],
+  settings:['ตั้งค่าการเล่น','ตั้งค่าการทำงาน','ปรับค่าก่อนเริ่มรอบใหม่ · ค่าที่เปลี่ยนไม่กระทบจอที่กำลังเล่น'],
+  accounts:['บัญชีทีม','สมาชิกในทีม','บัญชีและตัวละครที่ใช้ในแต่ละจอ'],
+};
+function selectView(name) {
+  if (!viewInfo[name]) name = 'overview';
+  activeView = name;
+  document.querySelectorAll('.view').forEach(el => { el.hidden = el.id !== 'view-' + name; });
+  document.querySelectorAll('[data-view]').forEach(el => {
+    const on = el.dataset.view === name;
+    el.classList.toggle('active', on);
+    if (on) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
+  });
+  $('viewLabel').textContent = viewInfo[name][0];
+  $('pageTitle').textContent = viewInfo[name][1];
+  $('pageSubtitle').textContent = viewInfo[name][2];
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  if (name === 'map') refreshTeamMap();
+  if (name === 'characters') refreshCharTabs();
+  if (name === 'plans') refreshPlan();
+  if (name === 'activity') refreshLog();
+  if (name === 'activity' || name === 'reports') refreshReports();
+  if (name === 'reports') { refreshAdvisor(); refreshTeamBrain(); }
+  if (name === 'accounts') refreshTeam();
+}
+document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => selectView(button.dataset.view)));
+window.addEventListener('hashchange', () => selectView(location.hash.slice(1)));
+function renderFleet(s) {
+  latestStatus = s;
+  const currentRun = !s.running || (s.snapshotAt && new Date(s.snapshotAt).getTime() >= s.startedAt);
+  const rows = currentRun ? (s.instances || []) : [];
+  let expPanel=$('teamExpProgress');
+  if(!expPanel){expPanel=document.createElement('section');expPanel.id='teamExpProgress';expPanel.innerHTML='<h2>EXP ของทีม · ความคืบหน้าเลเวล</h2><div class="exp-team"></div>';const reportView=$('view-reports');reportView.insertBefore(expPanel,reportView.firstChild);}
+  expPanel.querySelector('.exp-team').innerHTML=rows.map(i=>expBar(i,i.char||'จอ '+i.slot)).join('')||'<p class="muted">รอข้อมูลตัวละคร</p>';
+  const stale = !currentRun || !s.snapshotAt || Date.now() - new Date(s.snapshotAt).getTime() > 90000;
+  const fps = rows.filter(i => i.status === 'playing' && i.fps > 0).map(i => i.fps);
+  $('sFps').textContent = s.running && !stale && fps.length ? Math.min(...fps) : '–';
+  $('sFps').className = fps.length && Math.min(...fps) < 20 ? 'warn' : '';
+  const free = s.host.freeMb, total = s.host.totalMb;
+  $('memoryHint').textContent = 'จากทั้งหมด ' + (total / 1024).toFixed(1) + ' GB';
+  $('memoryBar').style.width = Math.max(0, Math.min(100, free / total * 100)) + '%';
+  $('memoryBar').style.background = free < 1500 ? 'var(--warn)' : 'var(--acc)';
+  $('modeLabel').textContent = s.options && (s.options.god || s.options.nodraw) ? 'โหมดประหยัด · ไม่มีภาพพรีวิว' : 'รายงานสถานะเป็นข้อความ';
+  const noPreview = !!(s.options && (s.options.god || s.options.nodraw));
+  $('showScreens').disabled = noPreview;
+  if (noPreview) $('showScreens').checked = false;
+  $('fleetCards').classList.toggle('stale', stale || !s.running);
+  const needsAttention = i => i.status !== 'playing' || (i.fps > 0 && i.fps < 20) || i.noProgressFor > 180;
+  const visible = rows.filter(i => !$('issuesOnly').checked || needsAttention(i));
+  const cards = visible.map(i => {
+    const waiting = i.status !== 'playing';
+    const activity = !s.running ? 'หยุดการทำงานแล้ว' : stale ? 'รอข้อมูลสถานะใหม่' : i.choresBusy ? 'กำลังทำธุระในเมือง' : waiting ? ({recycling:'กำลังคืนหน่วยความจำและเชื่อมต่อใหม่',booting:'กำลังเข้าสู่โลกเกม',reloading:'กำลังโหลดเกมใหม่'}[i.status] || 'กำลังเตรียมตัวละคร') : i.goal ? i.goal.label : 'กำลังเล่น · รอเป้าหมายถัดไป';
+    const num = n => typeof n === 'number' ? Math.round(n).toLocaleString() : '–';
+    return '<article class="agent-card' + (needsAttention(i) ? ' attention' : '') + '"><div class="agent-head"><div class="agent-avatar">' + String(i.slot).padStart(2,'0') + '</div><div class="agent-name"><b>' + escA(i.char || 'กำลังเตรียมตัวละคร') + '</b><small>จอ ' + i.slot + ' · ' + escA(i.job || 'รอข้อมูลอาชีพ') + '</small></div>' + pill(!s.running ? 'stopped' : stale ? 'ข้อมูลเก่า' : i.status) + '</div>' +
+      '<div class="agent-goal"><span>เป้าหมาย / สถานะปัจจุบัน</span><h3 title="' + escA(i.goal && i.goal.reason || '') + '">' + escA(activity) + '</h3></div>' +
+      '<div class="agent-location">แผนที่ปัจจุบัน <b>' + escA(i.mapId || '–') + '</b>' + (i.goal && i.goal.mapName ? ' · เป้าหมาย ' + escA(i.goal.mapName) : '') + '</div>' +
+      '<div class="agent-metrics"><div><span>เลเวล</span><b>' + num(i.lv) + '</b></div><div><span>FPS ล่าสุด</span><b class="' + (i.fps > 0 && i.fps < 20 ? 'warn' : '') + '">' + (s.running && !stale && !waiting ? num(i.fps || null) : '–') + '</b></div><div><span>เหรียญ</span><b>' + num(i.coins) + '</b></div></div>' +
+      expBar(i) + '<div class="agent-bottom"><span>' + (i.lastSaveAgo == null ? 'รอบันทึกสถานะ' : 'บันทึกล่าสุด ' + i.lastSaveAgo + ' วิ ก่อนข้อมูลชุดนี้') + '</span><button class="detail-link" data-character="' + i.slot + '">ดูรายละเอียด ↗</button></div></article>';
+  }).join('');
+  const markup = cards || '<div class="empty-state">' + (rows.length ? 'ไม่มีจอที่เข้าเงื่อนไขตรวจสอบในข้อมูลล่าสุด' : s.running ? 'กำลังเริ่มรอบใหม่ · รอรายงานสถานะตัวละคร' : 'ยังไม่มีตัวละครที่กำลังทำงาน · กดเริ่มเล่นเมื่อพร้อม') + '</div>';
+  if ($('fleetCards').innerHTML !== markup) $('fleetCards').innerHTML = markup;
+}
+$('issuesOnly').addEventListener('change', () => { if (latestStatus) renderFleet(latestStatus); });
+$('fleetCards').addEventListener('click', event => {
+  const button = event.target.closest('[data-character]');
+  if (!button) return;
+  charSlot = +button.dataset.character;
+  selectView('characters');
+});
+selectView(location.hash.slice(1));
+
+</script>
+</body></html>

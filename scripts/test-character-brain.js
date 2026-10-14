@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
+const {profile,prioritize}=require('../src/character-brain'),{TeamRoom,teamView}=require('../src/team-room'),{BrainMemory}=require('../src/brain-memory');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-personal-'));fs.mkdirSync(path.join(root,'logs'));
+const items={old:{id:'old',name:'old',slot:'weapon',stats:{atk:1}},better:{id:'better',name:'better',slot:'weapon',stats:{atk:10}}};
+const wiki={crafting:{recipes:[{type:'gear',result:'better',resultId:'better',reqLv:1,cost:{Copper:100,Ore:2}}]},monsters:{monsters:[]}};
+items.fixtureWing={id:'fixtureWing',slot:'wing',stats:{hp:1}};
+const p=profile({pets:{pet:0},petActive:'pet',lv:10,job:'dragonknight',equip:{wing:'fixtureWing',weapon:'old'},coins:2000,materials:{Ore:2}},{items},wiki);
+assert(p.craft.ready);assert(p.availableFocuses.includes('focus_craft'));assert.equal(profile({lv:10,equip:{weapon:'better'},coins:2000},{items},wiki).craft,null);
+assert.equal(prioritize([{kind:'exp',priority:5},{kind:'income',priority:6}],null,{lowFunds:true})[0].kind,'income');
+const b=new BrainMemory(root,0);b.setStrategy('focus_income','save');assert.equal(new BrainMemory(root,0).strategy().action,'focus_income');assert.equal(b.strategy(Date.now()+1000000),null);
+const room=new TeamRoom(root);room.post('จอ 0','หัวหน้า','hello');room.post('จอ 0','หัวหน้า','hello');assert.equal(room.messages.length,1);
+fs.writeFileSync(path.join(root,'team.json'),JSON.stringify({members:[{slot:0,charName:'A',password:'SECRET'},{slot:1,charName:'B'}]}));
+fs.writeFileSync(path.join(root,'logs/status.json'),JSON.stringify({at:new Date().toISOString(),instances:[{slot:0,char:'A',status:'playing'}],party:{members:['A'],checkedAt:Date.now()},guild:{name:'G',members:['A','B'],checkedAt:Date.now()}}));
+let v=teamView(root,true);assert(!JSON.stringify(v).includes('SECRET'));assert.equal(v.members[1].party,'missing');assert.equal(v.guild.complete,true);assert.equal(v.members[1].gameStatus,'not-started');assert.equal(teamView(root,false).guild.complete,false);assert.equal(teamView(root,true,Date.now()+130000).members[0].guild,'unknown');
+console.log('PASS: per-character craft upgrade/reserve, income priority, persistent strategy, team messages dedup, roster membership vs online, stale data, no credentials');

@@ -1,0 +1,27 @@
+'use strict';
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path'),vm=require('vm');
+const {QuestOutcomes}=require('../src/learning/quest-outcomes'),{ResultLedger}=require('../src/result-ledger'),{GameInstance}=require('../src/instance'),source=require('../src/knowledge/development-source'),economy=require('../src/economy');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-quest-development-'));
+(async()=>{try{
+ const q=new QuestOutcomes(root,'test-character','build-a'),before={qIndex:3,qv:4,coins:100,tokens:0,boardQuest:{goal:8,count:8,mapId:'c1',targetName:'monster'},daily:{day:'2026-10-01',board:0,got:[false,false,false],all:false}};
+ q.observe(before,100);q.begin(before,110);q.observe({...before,boardQuest:null},120);assert(!q.view().rows.length,'cancel or click without counter is not success');
+ q.observe({...before,qIndex:4,boardQuest:null,coins:300,tokens:2,daily:{...before.daily,board:1,got:[true,false,false]}},130);assert.deepEqual(q.view().rows.map(r=>r.kind).sort(),['board_reward','daily_reward','main_quest']);assert(!q.view().serverVerified);
+ q.observe({...before,qIndex:99,qv:5,daily:{day:'2026-10-02',board:0,got:[true,true,true],all:true}},140);assert.equal(q.view().rows.length,3,'daily reset and quest migration do not invent completions');
+ assert.equal(new QuestOutcomes(root,'test-character','build-b').view().rows.length,0);assert.equal(new QuestOutcomes(root,'other-character','build-a').view().rows.length,0);
+ const ledger=new ResultLedger(root,0);ledger.begin('refine',{id:'target'},{refine:{target:0,other:0}},200);ledger.observe({refine:{target:0,other:1}},210);assert(ledger.pending(),'unrelated gear change must not prove target refinement');ledger.observe({refine:{target:1,other:1}},220);assert.equal(ledger.view()[0].status,'change_observed');
+ let claimed=0,cancelled=0;const i=Object.create(GameInstance.prototype);let reachedNPC=false;i.lastSaveAt=Date.now();i.lastSave=before;i.questOutcomes={begin:()=>assert(reachedNPC,'claim intent starts after NPC walk')};i.openTownService=async()=>{reachedNPC=true;return {ok:true};};i.closePanel=async()=>{};i.log=()=>{};i.eval=async code=>vm.runInNewContext(code,{document:{querySelector:selector=>selector==='[data-claim-board]'?{disabled:false,click:()=>claimed++}:selector==='[data-cancel-board]'?{click:()=>cancelled++}:null}});assert.equal((await i.workQuestBoard({cancel:true})).action,'claimed');assert.equal(claimed,1);assert.equal(cancelled,0);
+ const text=fs.readFileSync(path.resolve(__dirname,'../src/instance.js'),'utf8'),start=text.indexOf('    if (inTownNow && !s.panelOpen && this.autoQuestBoard'),end=text.indexOf('    // 7. Town chores:',start),block=text.slice(start,end);
+ const actions=[];const actor={lastSave:{boardQuest:{mapId:'c1',goal:8,count:8},mapId:'town'},goal:{mapId:'c2'},autoQuestBoard:true,canDo:()=>true,workQuestBoard:async args=>{actions.push(args?.cancel?'cancel':'claim');return {action:'claimed'};}};
+ const runBoard=()=>vm.runInNewContext('(async function(){'+block+'}).call(actor)',{actor,inTownNow:true,s:{panelOpen:false},require:()=>require('../src/runtime/work-continuity')});
+ await runBoard();assert.deepEqual(actions,['claim']);
+ actions.length=0;actor.pendingTravel={mapId:'c2'};await runBoard();assert.equal(actions.length,0,'even a completed contract cannot interrupt an owned route');delete actor.pendingTravel;
+ actor.campaignGoal={kind:'card-collection',sideWork:true,mapId:'c2'};await runBoard();assert.equal(actions.length,0,'card campaign navigation cannot be stolen by the board');delete actor.campaignGoal;
+ actor.lastSave.boardQuest.count=1;actor.goal.mapId='c1';await runBoard();assert.equal(actions.length,0,'town map must not cancel a matching farm contract');
+ const workspace=path.resolve(__dirname,'..'),build=economy.newestBuild(workspace),catalog=economy.loadCatalog(workspace,build),wiki=economy.loadWiki(workspace);
+ assert(source.check(workspace,build,'craft',['Ember Talisman','gear'],catalog,wiki).allowed);
+ const paid=require('../src/runtime/paid-actions'),probe={root:workspace,catalog:()=>catalog,lastSave:{job:'nightfang',coins:100000,tokens:150,runeDust:100,leaves:70}};const estimate=paid.estimate(probe,'craftAtExchange',['Old Tusk Charm','unique']);assert.equal(estimate.cost['Guild Token'],20);assert.equal(paid.inventory(probe.lastSave,catalog)['Boar Leaf'],70);assert.equal(paid.inventory(probe.lastSave,catalog)['Guild Token'],150);
+ const modified=JSON.parse(JSON.stringify(wiki));modified.crafting.recipes.find(r=>r.result==='Ember Talisman').cost.Copper++;assert(!source.check(workspace,build,'craft',['Ember Talisman','gear'],catalog,modified).allowed);
+ assert(!source.check(workspace,build,'craft',['Imaginary item','gear'],catalog,wiki).allowed);assert(!source.check(workspace,build,'enchant',[],catalog,wiki).allowed);
+ const fake=path.join(root,'cache','future','asteria-online.io');fs.mkdirSync(fake,{recursive:true});fs.writeFileSync(path.join(fake,'asteria-online-visual-polish.html'),'changed client');assert(!source.check(root,'future','refine',[],catalog,wiki).allowed);
+ console.log('PASS reward proof vs cancel, daily/quest version boundaries, identity isolation, target-specific refine, claim before cancel, exact craft recipe, drift/unknown source blocked');
+}finally{fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

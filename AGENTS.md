@@ -1,0 +1,3 @@
+# Public repository instructions
+
+This is a sanitized public source release. Never add real credentials, account or character identities, server addresses, trust keys, runtime records or internal audit reports. Keep actual machine configuration in ignored files and use fictional examples in tests. Preserve transaction no-replay, human stop, ownership and receipt verification. Do not execute live game/deployment scripts as part of testing. Run the public checks and secret scan before publishing changes. Record source changes and actual validation in LATEST-DEVELOPMENT-STATUS.md without operational details.
