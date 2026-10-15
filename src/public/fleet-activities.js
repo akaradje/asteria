@@ -2,9 +2,9 @@
 let activityControl=null,activityLoading=false,activitySending=false,activityRetry=null,activityReadAt=0,activityError='';
 function activityControlsText(d){
  const c=d?.controls,workflow=d?.workflow;
- if(workflow&&!['IDLE','COMPLETE','FINISHED','WITHDRAWN'].includes(workflow.phase))return 'งานทีม '+({guild:'ดันกิลด์',rift:'Eclipse Rift',tower:'หอคอย'}[workflow.kind]||workflow.kind)+' · '+workflow.phase+' · '+(workflow.reason||'ตรวจทั้ง 6 คนก่อนเปิดและยืนยันผลหลังจบ');
+ if(workflow&&!['IDLE','COMPLETE','FINISHED','WITHDRAWN'].includes(workflow.phase))return 'งานทีม '+({guild:'ดันกิลด์',rift:'Eclipse Rift',tower:'หอคอย'}[workflow.kind]||workflow.kind)+' · '+workflow.phase+' · '+(workflow.reason||'ตรวจสมาชิกในทีมของโฮสต์ก่อนเปิดและยืนยันผลหลังจบ');
  if(c?.request&&['PENDING','WAITING'].includes(c.request.status))return 'รอระดมพล · '+c.request.reason+' · ครบเงื่อนไขภายใน 10 นาทีจึงเริ่ม';
- return c?.autoEnabled?'เปิดกิจกรรมรายวันอัตโนมัติ · รวม 6 คนเมื่อข้อมูลและโควต้าพร้อม':'ฟาร์มเลเวลและหาไอเทมรายตัว · พักกิจกรรมทีม · ใช้ปุ่มระดมพลเมื่อต้องการ';
+ return c?.autoEnabled?'เปิดกิจกรรมรายวันอัตโนมัติ · รวมสมาชิกในทีมของโฮสต์เมื่อข้อมูลและโควต้าพร้อม':'ฟาร์มเลเวลและหาไอเทมรายตัว · พักกิจกรรมทีม · ใช้ปุ่มระดมพลเมื่อต้องการ';
 }
 function paintActivityControls(d){
  const controls=document.getElementById('activityControls'),toggle=document.getElementById('activityAuto');

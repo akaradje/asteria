@@ -97,6 +97,10 @@ function installRuntimeV2(GameInstance){
   syncLearning(this,v);v.farmEvidence ||=new(require('../learning/farm-evidence').FarmEvidence)(this.actorStateRoot||this.root,this.actorIdentity?.actorId||this.credentials?.charName||'slot-'+this.slot);v.farmEvidence.observe(this,v.learningRevision);this.journeyMemory ||=new(require('../planning/character-journey').JourneyMemory)(this.actorStateRoot||this.root,this.actorIdentity?.actorId||this.credentials?.charName||'slot-'+this.slot);this.journeyMemory.observe(this);v.journal.observe(this.lastSave,this.lastSaveAt);v.learning.observe(this,learningBuild(this));learningObserved=true;this.observeAdvanced?.();
   // Account rewards work in the field too. They must not wait behind a capped
   // character's town chores or reserve navigation for a dungeon it cannot enter.
+  // Closed history needs a current authenticated generation before a NEW roll.
+  // This zero-spend GET must not wait behind reduced/optional town work. The
+  // existing scope still rejects protected owners, payments and unsafe vitals.
+  if(!policy.dungeon&&(await require('./refine-scope').refreshReadback(this)).attempted)return 'equipment native ownership readback: replan on next fresh tick';
   const optionalAllowed=require('./v3-instance').optionalWork(this,sessionNow)&&!require('./milestone-assistance').supplyIntent(this,sessionNow)?.due;
   if(!policy.dungeon&&optionalAllowed&&sessionNow-(v.rewardsAt||0)>=60000){
    v.rewardsAt=sessionNow;await require('./free-rewards').run(this);

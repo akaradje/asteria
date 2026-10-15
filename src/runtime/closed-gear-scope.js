@@ -9,12 +9,11 @@ function native(i,now=Date.now()){
  const p=i.serverSaveReceipt?.proof,s=i.serverSaveReceipt?.state;
  return /^actor-[a-f0-9]{32}$/.test(i.actorIdentity?.actorId||'')&&!!i.actorOwner&&i.registryV32?.store?.validateOwner(i.actorOwner)===true&&i.v2?.sourceCoherence?.matches===true&&p?.authority==='server_readback'&&p.actorId===i.actorIdentity.actorId&&p.build===i.catalog().build&&p.generation===i.socialInbox?.generation&&p.sessionStartedAt===i.bagSessionStartedAt&&Number.isSafeInteger(p.rev)&&p.rev>=0&&Number.isFinite(p.requestAt)&&p.requestAt>=p.sessionStartedAt&&Number.isFinite(p.at)&&p.at>=p.requestAt&&p.at<=now&&p.at-p.requestAt<=30000&&Number.isSafeInteger(s?.coins)&&s.coins>=0&&s.materials&&Object.values(s.materials).every(n=>Number.isSafeInteger(n)&&n>=0)&&s.equip&&s.refine&&require('./freshness').decisionGate(i,now).allowed;
 }
-const originals=new Map();
 function previousRefine(i,row,id){
  let original;
  if(row.legacyIdentityUnknown){
   const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),file=path.join(i.root,'logs/migration-originals',row.originalSha256+'.json');
-  try{if(!originals.has(file)){const bytes=fs.readFileSync(file);if(crypto.createHash('sha256').update(bytes).digest('hex')!==row.originalSha256)return null;originals.set(file,JSON.parse(bytes).rows);}original=originals.get(file)?.find(r=>'development:'+r.id===row.id&&r.kind==='refine'&&r.target?.id===id&&r.at===row.at);}catch{return null;}
+  try{const bytes=fs.readFileSync(file);if(crypto.createHash('sha256').update(bytes).digest('hex')!==row.originalSha256)return null;original=JSON.parse(bytes).rows?.find(r=>'development:'+r.id===row.id&&r.kind==='refine'&&r.target?.id===id&&r.at===row.at);}catch{return null;}
  }else original=i.developmentLedger?.rows?.find(r=>'development:'+r.id===row.id&&r.kind==='refine'&&r.target?.id===id&&r.at===row.at);
  const before=original?.before?.refine?.[id]??(Object.values(original?.before?.equip||{}).includes(id)?0:null);
  return Number.isInteger(before)&&before>=0?before:null;

@@ -18,19 +18,24 @@ function currentReceipt(i,now){
  const p=i.serverSaveReceipt?.proof;
  return p?.authority==='server_readback'&&p.actorId===i.actorIdentity?.actorId&&p.build===i.catalog().build&&p.sessionStartedAt===i.bagSessionStartedAt&&p.generation===i.socialInbox?.generation&&Number.isSafeInteger(p.rev)&&Number.isFinite(p.requestAt)&&p.requestAt>=p.sessionStartedAt&&Number.isFinite(p.at)&&p.at>=p.requestAt&&p.at<=now&&p.at-p.requestAt<=30000;
 }
+function readbackStatus(i,now=Date.now()){
+ const p=i.serverSaveReceipt?.proof;
+ const reason=!p?'native equipment readback missing':p.actorId!==i.actorIdentity?.actorId?'native equipment readback actor differs':p.build!==i.catalog().build?'native equipment readback build differs':p.sessionStartedAt!==i.bagSessionStartedAt||p.generation!==i.socialInbox?.generation?'native equipment readback session/generation differs':!currentReceipt(i,now)?'native equipment readback authority invalid':now-p.at>60000?'native equipment readback expired':null;
+ return {ready:reason===null,reason,at:p?.at||null,generation:p?.generation??null,currentGeneration:i.socialInbox?.generation??null,spend:0,replayAllowed:false};
+}
 async function refreshReadback(i,now=Date.now()){
  const fresh=require('./freshness'),deny={attempted:false};
  // Refresh native ownership after reconnect; never weaken the generation
  // binding or infer settlement from an outgoing save. Replan on a later tick.
  const renew=require('./fresh-refine-attempt').enabled(i)&&now-(i.serverSaveReceipt?.proof?.at||0)>30000;
- if(currentReceipt(i,now)&&!renew||!i.actorIdentity?.actorId||!i.actorOwner||!i.registryV32?.store?.validateOwner(i.actorOwner)||i.v2?.sourceCoherence?.matches!==true||!fresh.decisionGate(i,now).allowed||!fresh.fresh(i.vitals?.at,15000,now)||i.vitals.hp<.95||i.livePos?.dead||i.teamControl||i.dailyTeamPending||i.dailyWorkStatus?.ownsNavigation||i.pendingTravel||i.recycling||i.choresBusy||i.survivalRecovery||i.v2?.trial?.active()||require('./room-policy').roomPolicy(i.livePos?.room).dungeon||i.teamTradeStatus?.phase&&!['IDLE','CONFIRMED','CANCELLED'].includes(i.teamTradeStatus.phase)||i.activeDevelopmentAttempt)return deny;
+ if(currentReceipt(i,now)&&!renew||!i.actorIdentity?.actorId||!i.actorOwner||!i.registryV32?.store?.validateOwner(i.actorOwner)||i.v2?.sourceCoherence?.matches!==true||!fresh.decisionGate(i,now).allowed||!fresh.fresh(i.vitals?.at,15000,now)||i.vitals.hp<.95||i.livePos?.dead||i.teamControl||i.fleetActivityBusy||i.pvpMission||i.dailyTeamPending||i.dailyWorkStatus?.ownsNavigation||i.pendingTravel||i.recycling||i.healthRecovery||i.choresBusy||i.survivalRecovery||i.v2?.trial?.active()||require('./room-policy').roomPolicy(i.livePos?.room).dungeon||require('./team-trade').blocksNavigation(i)||i.activeResourceClaim||i.activeDevelopmentAttempt||i.nativeFreshSaveFlight||i.paidReadbackFlight||i.nativeReadbackFlight)return deny;
  if((i.developmentLedger?.rows||[]).some(r=>r.status==='pending')||i.registryV32.store.pending(i.actorIdentity.actorId).length)return deny;
  const cat=i.catalog(),start=i.bagSessionStartedAt;
  const old=(i.developmentLedger?.rows||[]).some(r=>r.kind==='refine'&&r.reconciliation?.replayBlocked===true)||(i.v2?.journal?.rows||[]).some(r=>require('./closed-gear-scope').history(i,r,now)||!r.legacyIdentityUnknown&&['UNCERTAIN','OBSERVED'].includes(r.status)&&Number.isFinite(r.at)&&start-r.at>=60000&&(r.kind==='refine'&&r.externalOwner==='development-ledger'&&cat.items[r.target?.id]||r.kind==='purchase'&&!r.externalOwner&&['Red Potion','Blue Potion','Orange Potion','Yellow Potion','White Potion','Starlight Potion'].includes(r.target?.item)));
  if(!old||!i.canDo('equipmentNativeReadback',60000))return deny;
  i.v2.scheduler?.checkpoint();
- try{await require('./isolated-storage').readback(i);i.equipmentReadbackStatus={at:Date.now(),verified:!!currentReceipt(i,Date.now()),reason:'native ownership readback; paid outcomes remain separately fenced'};}
+ try{const receipt=await require('./native-save-probe').authoritativeReadback(i);i.equipmentReadbackStatus={at:Date.now(),verified:!!receipt&&receipt===i.serverSaveReceipt&&readbackStatus(i).ready,reason:'native ownership readback; paid outcomes remain separately fenced'};}
  catch{ i.equipmentReadbackStatus={at:Date.now(),verified:false,reason:'native ownership readback unavailable; payment gates retained'}; }
  return {attempted:true,verified:i.equipmentReadbackStatus.verified};
 }
-module.exports={blocks,refreshReadback};
+module.exports={blocks,refreshReadback,readbackStatus};

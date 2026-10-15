@@ -42,7 +42,7 @@ async function main(){
  const d={charName:'Donor',status:'playing',teamInventory:{...inventory({weapon:'better'}),offers:[{id:'gold',index:0},{id:'high',index:1}]}},receiver={charName:'Receiver',status:'playing',teamInventory:inventory({weapon:'epic'})};
  const trade=choose([d,receiver],cat);assert.equal(trade.id,'gold');assert(trade.goalPromotion&&trade.gain<0);d.teamInventory.offers=[{id:'high',index:1}];assert.equal(choose([d,receiver],cat),null,'trade cannot deliver Epic as target');
  const ceiling=require('../src/planning/equipment-ceiling').assess(save,cat,null);assert(!ceiling.complete&&ceiling.goal.legendaryEquipped===1);
- const ctx={fmt:n=>String(n),esc:x=>String(x).replace(/[<>&]/g,'?')};vm.createContext(ctx);vm.runInContext(fs.readFileSync('src/public/fleet-layout.js','utf8'),ctx);const html=ctx.equipmentGoalLayout(g);assert(html.includes('Legendary 8 / 8')&&html.includes('+10 7 / 7')&&html.includes('รอตรวจความสามารถตีบวก: wing'));assert(!html.includes('เกมไม่รองรับตีบวกปีก'));assert(ctx.equipmentGoalLayout(currentGoal).includes('+10 8 / 8'));
+ const ctx={fmt:n=>String(n),esc:x=>String(x).replace(/[<>&]/g,'?')};vm.createContext(ctx);vm.runInContext(fs.readFileSync('src/public/fleet-layout.js','utf8'),ctx);const html=ctx.equipmentGoalLayout(g);assert(html.includes('Legendary 8 / 8')&&html.includes('เป้า native +10')&&html.includes('ถึงเป้า 7 ช่อง')&&html.includes('รอตรวจความสามารถตีบวก: wing'));assert(!html.includes('เกมไม่รองรับตีบวกปีก'));assert(ctx.equipmentGoalLayout(currentGoal).includes('ถึงเป้า 8 ช่อง'));
  // A first wing cannot freeze all paid development until the final boss drops.
  // Exercise the real shared budget and one-action runtime, not a click loop.
  {const at=Date.now(),board={now:at,_receivedAt:at,list:[{id:'boss',map:'town',up:false,next:at+600000}]};
@@ -65,7 +65,7 @@ async function main(){
   await runtime.tick(craftActor,{});assert.equal(crafts,1);assert.equal(equips,1,'owned native save triggers equip, not the click response alone');assert.equal(craftActor.equipmentMaintenanceStatus.status,'change_observed');
   craftActor.lastSave=save;craftActor.dailyTeamPending=true;await runtime.tick(craftActor,{});assert.equal(crafts,1,'team owner blocks paid side craft');craftActor.dailyTeamPending=false;
   craftActor.developmentLedger={blocking:()=>({status:'pending'}),view:()=>[{kind:'craft',status:'pending'}]};await runtime.tick(craftActor,{});assert.equal(crafts,1,'pending native result never replays the craft');
-  const j={fresh:true,saveAt:at,milestones:{stage:'equipment'},steps:[{id:'gear',legendary:'6/8',refine10:'2/7'}],slotQueue:[],verified:[]};const compact=ctx.characterJourneyLayout(j,true);assert(compact.includes('6/8 Legendary · +10 2/7')&&compact.includes('Legendary ครบ 8 ช่อง'));
+  const j={fresh:true,saveAt:at,milestones:{stage:'equipment'},steps:[{id:'gear',legendary:'6/8',refine10:'2/7'}],slotQueue:[],verified:[]};const compact=ctx.characterJourneyLayout(j,true);assert(compact.includes('6/8 Legendary · เพดาน รอข้อมูล')&&compact.includes('เพดานตีบวกตามกฎเกมที่โหลด'));
  }
  console.log('PASS Legendary-only promotion/no downgrade, distinct accessory and legal/unknown guards, exact +9 -> +10 native 6%/cost/ore, one paid attempt and reserve/owner/no-replay guards, negative-score ready craft/trade, truthful native slot refinement and unknown capability completion and UI');
 {

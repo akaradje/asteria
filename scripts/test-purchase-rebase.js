@@ -15,11 +15,15 @@ a(q.descriptor({id:'market',kind:'market-class',externalOwner:'class-market',sta
 for(const patch of [{machine:'windows'},{machine:'vps'},{status:'stopping'},{stopRequested:true},{teamControl:true},{pendingTravel:{}},{nativeFreshSaveFlight:{}},{activeResourceClaim:{}},{lastSaveAt:now-31000},{livePos:{room:'dx1',at:now}},{vitals:{hp:.1,at:now}}])a.equal(q.idle({...i,...patch},now),false,JSON.stringify(patch));
 (async()=>{
  await i.v2.scheduler.run('purchase-outcome-recovery',async()=>{
+  const claims=store.db.prepare('SELECT * FROM claims WHERE intent=? ORDER BY id').all(original.id),frozen=q.archive(i,{source:'durable',row:original},claims),file=path.join(root,frozen.file),bytes=fs.readFileSync(file),bad=JSON.parse(bytes);bad.original.bill.Copper=1;fs.writeFileSync(file,JSON.stringify(bad));
+  a.throws(()=>q.rebase(i,{source:'durable',row:original},{state:s,proof},closure),/Immutable purchase original differs/);a.equal(store.get(original.id).status,'UNCERTAIN');a.equal(store.held(actor).Copper,150000,'corrupt evidence cannot release a reserve');fs.writeFileSync(file,bytes);
   a(q.rebase(i,{source:'durable',row:original},{state:s,proof},closure));
  });
  const result=store.get(row.id);a.equal(result.status,'RECONCILED');a.equal(result.originalOutcome.status,'UNCERTAIN');a.equal(result.replayBlocked,true);a.equal(result.reconciliation.historicalSuccessKnown,false);a.equal(result.reconciliation.costKnown,false);a.deepEqual(result.target,original.target);a.deepEqual(result.bill,original.bill);a.deepEqual(result.receipts,[]);a.deepEqual(store.pending(actor),[]);a.deepEqual(store.held(actor),{});
  const bytes=fs.readFileSync(path.join(root,result.quarantine.file)),archive=JSON.parse(bytes);a.equal(crypto.createHash('sha256').update(bytes).digest('hex'),result.quarantine.sha256);a.deepEqual(archive.original,original);a.equal(archive.claims[0].status,'HELD');a.equal(archive.replayBlocked,true);a.throws(()=>store.begin({...original,available:{Copper:1000000}}),/never replay/);
  const restored=store.get(row.id);a.equal(q.descriptor(restored),null);a.equal(q.inspect(i).state,'idle');
+ const budget=require('../src/planning/budget-breakdown').project(i,null);a.deepEqual(budget.durableHeld,{},'Nerf-style reconciled Guardian reserve is not counted as new demand');a.equal(budget.historicalIsNotNewDemand,true);
+ const persisted=new DurableStore(path.join(root,'logs/runtime-v32.db'));a.deepEqual(persisted.held(actor),{});a.equal(persisted.get(row.id).replayBlocked,true);persisted.close();
  // Recovery must transition the OUTER contract before the nested native boot
  // changes page/generation. Otherwise nested checkpoints cancel a healthy boot.
  i.registryV32.policy={policyRevision:1};i.buildHash='b';i.page={};i.bagSessionStartedAt=old.sessionStartedAt;i.socialInbox.generation=old.generation;let recycleCalls=0;

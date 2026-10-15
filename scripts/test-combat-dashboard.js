@@ -14,7 +14,7 @@ const delayedGear=member();delayedGear.details.characterJourney.saveAt=now-40000
 const old=member();old.details.lastSaveAt=now-40000;old.details.characterJourney.saveAt=now-40000;v=model(old);assert(!v.fresh&&!v.blocked&&v.quiet===null);assert(ctx.combatOverviewCard(old,v).includes('งานล่าสุดที่ทราบ'));
 assert(!ctx.combatOverviewModel(member(),s,now-20000,now).fresh,'reception failure expires live proof');
 const future=member();future.details.lastSaveAt=now+1;future.details.characterJourney.saveAt=now+1;assert(!model(future).fresh);
-const unsupported=member();unsupported.details.characterJourney.steps[0].refine10='7/7';unsupported.details.characterJourney.steps[0].state='complete';v=model(unsupported);assert(v.complete&&v.refine[1]===7,'changed native supported set is respected');
+const unsupported=member();unsupported.details.characterJourney.steps[0].refine10='7/7';unsupported.details.characterJourney.steps[0].state='complete';v=model(unsupported);assert(!v.complete&&v.refine[1]===7,'legacy +10 ratio cannot certify current native ceiling');
 assert(model({...member(),machine:'windows',online:false}).paused);assert(model(s.expansion.members[0]).paused);
 const failed={machines:{tum:{running:false,error:'transport unavailable'}}};assert(!ctx.combatOverviewModel(member(),failed,now,now).paused,'transport failure is not an operator pause');
 const evil=member('<img src=x onerror=alert(1)>');evil.details.runtimeV3.controller.reason='<script>oops</script>';html=ctx.combatOverviewCard(evil,model(evil));assert(!html.includes('<img')&&!html.includes('<script>'));assert(html.includes('&lt;img'));
@@ -29,3 +29,21 @@ const page=fs.readFileSync('src/public/fleet.html','utf8');for(const id of Objec
 for(const block of page.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(block[1]);
 assert(page.includes("$('combatCards').addEventListener('click'"));assert(page.includes("if(state)renderCombatOverview(state,lastReceived)"));assert(!page.includes('สมาชิกทั้ง 6 ตัว'));
 console.log('PASS combat dashboard: native denominator, goal evidence, stale/future/reception expiry, pause versus transport, build scope, XSS, unified hosts, filters and inline syntax');
+
+// Current native ceiling, role evidence and budget distinctions.
+const native=member();native.details.characterJourney.slotQueue=['weapon','offhand','head','armor','boots','wing','acc1','acc2'].map(slot=>({slot,name:slot,rarityMet:true,ruleVerified:true,refineSupported:true,refine:10,nativeMax:15,complete:false}));
+assert(!model(native).complete);html=ctx.combatOverviewCard(native,model(native));assert(html.includes('เพดานเกม +15'));assert(!html.includes('+10 ตามกฎรุ่นเกม'));
+native.details.characterJourney.slotQueue.forEach(r=>{r.refine=15;r.complete=true;});assert(model(native).complete);
+assert(ctx.commandTelemetry({}).includes('ยังไม่มีหน้าต่าง'));
+const tank={at:now,role:'tank',combatDomain:'scaled_instance',map:'tw#123',ehpReference:95.2,mitigationReference:-481.75,observedDamagePerHit:{p95:48275},observedMs:120000};
+html=ctx.commandTelemetry({actualProgress:{grandmaster:{combat:{current:tank,readyWindows:3,comparisonWindows:0}}}});assert(!html.includes('-481')&&!html.includes('95.2'));assert(html.includes('P95')&&html.includes('48,275'));
+const solo={at:now,role:'support',combatDomain:'field',observedMs:120000,soloSustainTelemetry:{selfHealsPerMinute:2,potionFreeFraction:1,selfBuffUptime:{'<unsafe>':.75}},partySupportTelemetry:{nearbyMembers:0,partyCoverageMs:0,healEvents:0,zeroDeathSustainedMs:0}};
+html=ctx.commandTelemetry({actualProgress:{grandmaster:{combat:{current:solo}}}});assert(html.includes('ฮีลตนเอง')&&html.includes('75%')&&html.includes('&lt;unsafe&gt;'));
+html=ctx.commandBudget({coins:500000,developmentProgress:{budgetBreakdown:{historical:{count:2,cost:{Starmetal:15}},active:{count:1,cost:{Copper:2000}},nextRefine:[{id:'shield',materials:{Starmetal:4}}],supplyCopper:12000}}});assert(html.includes('ประวัติรอ Rebase')&&html.includes('ธุรกรรมกำลังทำ')&&html.includes('ตัวเลือกตีบวก')&&html.includes('ยอดประวัติไม่ใช่ความต้องการฟาร์มใหม่'));
+for(const phase of ['UNCERTAIN','CANCELLED','CONFIRMED','RECONCILED']){html=ctx.commandTrade({teamTradeStatus:{phase,receiptId:12}});assert(!html.includes('มีใบรับผลฝั่งนี้'));}
+html=ctx.commandTrade({teamTradeStatus:{phase:'UNCERTAIN',resolution:'resolved_not_dispatched',noDispatch:true}});assert(html.includes('ปิดรายการ')&&!html.includes('ผลเทรดยังไม่แน่นอน'));
+html=ctx.commandTrade({teamTradeStatus:{phase:'CONFIRMED',receiptId:12,recordedNativeConfirmation:true,nativeInventoryProof:{authority:'server_readback'}}});assert(html.includes('รอเทียบสองฝั่ง'));
+nodes.commandHost={value:'tum'};nodes.commandSearch={value:'Tank'};nodes.combatFilter.value='all';ctx.renderCombatOverview(s,now);assert(nodes.combatCards.html.includes('Tank')&&!nodes.combatCards.html.includes('Lag'));nodes.commandSearch.value='nothing';ctx.renderCombatOverview(s,now);assert(nodes.combatCards.html.includes('ไม่มีตัวละคร'));
+console.log('PASS command center: native ceilings, scaled-instance EHP exclusion, solo support, budget domains, no inferred bilateral trade success, search/host filters');
+
+const remoteTeam={...s,members:[member('Tank'),{...member('Windows','windows'),online:false}],expansion:{members:[member('Lag','vps'),{...member('Parked','vps'),paused:true}]}};nodes.commandHost.value='all';nodes.commandSearch.value='';nodes.combatFilter.value='remote';ctx.renderCombatOverview(remoteTeam,now);assert(nodes.combatCards.html.includes('Tank')&&nodes.combatCards.html.includes('Lag'));assert(!nodes.combatCards.html.includes('Windows')&&!nodes.combatCards.html.includes('Parked'));const recorded=member();recorded.details.developmentProgress.personalBrain={recentDecisions:[{at:now,reason:'gather Starmetal',action:'focus_refine'}]};html=ctx.combatOverviewCard(recorded,model(recorded));assert(html.includes('gather Starmetal')&&html.includes('ยังไม่ยืนยันการใช้แผน'));console.log('PASS current remote team scope and projected AI decision without false applied claim');

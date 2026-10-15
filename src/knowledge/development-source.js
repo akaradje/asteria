@@ -2,7 +2,20 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),vm=require('node:vm');
 const semantics=require('./native-contract'),cached=new Map(),canonical=o=>JSON.stringify(Object.entries(o||{}).sort(([a],[b])=>a.localeCompare(b)));
 function evaluate(code,input){semantics.dataConstruction(code);input={...input,...(input.AsteriaWorld?{AsteriaWorld:JSON.parse(JSON.stringify(input.AsteriaWorld))}:{}),...(input.ITEMS?{ITEMS:JSON.parse(JSON.stringify(input.ITEMS))}:{})};return vm.runInNewContext(code,input,{timeout:1000,contextCodeGeneration:{strings:false,wasm:false}});}
-function constructedRecipes(text,catalog){const code=semantics.recipeConstruction(text).replace(/EXCHANGE;$/, 'JSON.stringify(EXCHANGE);');return JSON.parse(evaluate(code,{AsteriaWorld:{EQUIPMENT:catalog?.world?.EQUIPMENT||[],MONSTERS:catalog?.world?.MONSTERS||[]},ITEMS:catalog?.items||{},RX:(type,out,cost,reqLv=0)=>({type,out,cost,reqLv}),__L:(text,...args)=>Array.isArray(text)?text.reduce((s,t,n)=>s+t+(args[n]??''),''):text}));}
+function constructedRecipes(text,catalog){
+ let code=semantics.recipeConstruction(text).replace(/EXCHANGE;$/, 'JSON.stringify(EXCHANGE);');
+ const world=catalog?.world||{},data={EQUIPMENT:world.EQUIPMENT||[],MONSTERS:world.MONSTERS||[]};
+ if(code.includes('AsteriaWorld.newClassOpen')){
+  // The current native catalog filters unopened classes. Verify the pure
+  // predicate structurally; recreate it inside the data VM, never inject an
+  // arbitrary host callable or treat every future class as open.
+  const parse=s=>require('acorn').parse('('+s+')',{ecmaVersion:'latest'}).body[0].expression;
+  const expected='id=>!NEWCLASS[id]||!!NEWCLASS[id].open';
+  if(typeof world.newClassOpen!=='function'||!world.NEWCLASS||typeof world.NEWCLASS!=='object'||Array.isArray(world.NEWCLASS)||JSON.stringify(semantics.clean(parse(String(world.newClassOpen))))!==JSON.stringify(semantics.clean(parse(expected))))throw Error('native class availability predicate requires review');
+  data.NEWCLASS=world.NEWCLASS;code='AsteriaWorld.newClassOpen=id=>!AsteriaWorld.NEWCLASS[id]||!!AsteriaWorld.NEWCLASS[id].open;\n'+code;
+ }
+ return JSON.parse(evaluate(code,{AsteriaWorld:data,ITEMS:catalog?.items||{},RX:(type,out,cost,reqLv=0)=>({type,out,cost,reqLv}),__L:(text,...args)=>Array.isArray(text)?text.reduce((s,t,n)=>s+t+(args[n]??''),''):text}));
+}
 function nativeEquipmentRecipes(root,build,catalog){try{
  const text=fs.readFileSync(path.join(root,'cache',build,'asteria-online.io','asteria-online-visual-polish.html'),'utf8');
  if(!semantics.validate(text,'craft').allowed)return [];
@@ -52,4 +65,4 @@ function recentMatchingSource(state,build,now=Date.now(),identity,root){
  const age=now-Number(state?.current?.at);
  return !!build&&state?.current?.build===build&&state?.liveBuild===build&&Number.isFinite(age)&&age>=-5000&&age<900000&&!!identity&&require('./loaded-source').inspect('',build,state.current.sourceHashes,{liveBuild:state.liveBuild,identity}).matches&&(!root||require('./loaded-source').inspect(root,build,identity.sourceHashes).matches);
 }
-module.exports={check,source,nativeEquipmentRecipes,craftFingerprint,refineFingerprint,refineHelperFingerprint,enchantFingerprint,recentMatchingSource};
+module.exports={check,source,nativeEquipmentRecipes,constructedRecipes,craftFingerprint,refineFingerprint,refineHelperFingerprint,enchantFingerprint,recentMatchingSource};

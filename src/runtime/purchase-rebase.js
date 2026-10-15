@@ -48,7 +48,7 @@ function archive(i,entry,claims){
  fs.mkdirSync(dir,{recursive:true});const original=JSON.stringify(row),payload={version:1,source:entry.source,actorId:i.actorIdentity.actorId,transactionId:row.id,originalSha256:sha(Buffer.from(original)),original:row,claims,replayBlocked:true,historicalOutcome:'UNKNOWN'};
  const bytes=Buffer.from(JSON.stringify(payload));
  try{const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}const fdDir=process.platform==='win32'?null:fs.openSync(dir,'r');if(fdDir!==null){try{fs.fsyncSync(fdDir);}finally{fs.closeSync(fdDir);}}}catch(e){if(e.code!=='EEXIST')throw e;}
- const frozen=fs.readFileSync(file),saved=JSON.parse(frozen);if(saved.originalSha256!==payload.originalSha256||JSON.stringify(saved.claims)!==JSON.stringify(claims)||saved.transactionId!==row.id||saved.replayBlocked!==true)throw Error('Immutable purchase original differs; preserve fence');
+ const frozen=fs.readFileSync(file),saved=JSON.parse(frozen);if(saved.version!==1||saved.source!==entry.source||saved.actorId!==i.actorIdentity.actorId||sha(Buffer.from(JSON.stringify(saved.original)))!==saved.originalSha256||saved.originalSha256!==payload.originalSha256||JSON.stringify(saved.claims)!==JSON.stringify(claims)||saved.transactionId!==row.id||saved.replayBlocked!==true||saved.historicalOutcome!=='UNKNOWN')throw Error('Immutable purchase original differs; preserve fence');
  return {file:path.relative(i.root,file).replace(/\\/g,'/'),sha256:sha(frozen),originalSha256:payload.originalSha256};
 }
 function currentMatches(i,receipt){return require('./isolated-storage').equal(require('../result-ledger').snapshot(receipt.state),require('../result-ledger').snapshot(i.lastSave));}

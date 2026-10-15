@@ -24,6 +24,12 @@ const root=process.cwd(),build=JSON.parse(fs.readFileSync(path.join(root,'machin
 }
 assert(require('../src/knowledge/native-contract').validate(text,'craft').allowed);
 {
+ const snippet="const EXCHANGE=[];for(const w of AsteriaWorld.EQUIPMENT.filter(i=>(i.jobs||[]).every(AsteriaWorld.newClassOpen)))EXCHANGE.push(RX('gear',{item:w.id},{coins:100},1));";
+ const world={NEWCLASS:{future:{open:false},released:{open:true}},EQUIPMENT:[{id:'future_item',jobs:['future']},{id:'open_item',jobs:['released']},{id:'old_item',jobs:['existing']}],newClassOpen:id=>!NEWCLASS[id]||!!NEWCLASS[id].open};
+ assert.deepEqual(review.constructedRecipes(snippet,{world}).map(r=>r.out.item),['open_item','old_item'],'sandbox preserves native class availability without host callbacks');
+ for(const fn of [()=>true,id=>process.exit(),id=>!NEWCLASS[id]||!!NEWCLASS[id].enabled])assert.throws(()=>review.constructedRecipes(snippet,{world:{...world,newClassOpen:fn}}),/predicate requires review/);
+}
+{
  const pinned=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-pinned-native-'));
  try{
   const base=path.join(pinned,'cache',build,'asteria-online.io');fs.mkdirSync(base,{recursive:true});

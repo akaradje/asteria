@@ -1,3 +1,15 @@
+## Frozen progression regression PASS — 2026-10-15T21:30:54.935378+07:00 Asia/Bangkok
+
+Windows155/155, isolated Linux155/155, public20/20 and11 protected source boundaries PASS. Both complete runs preserve exact application/native source identities. Syntax/private-value and staged secret scans PASS. Deployment and native combat outcomes are verified separately.
+
+## Closed-history progression ownership repair — 2026-10-15T21:23:22.871548+07:00 Asia/Bangkok
+
+Refresh authenticated native equipment readback before reduced optional work, retain ownership/payment/protected-work guards and expose exact proof/session/generation blockers to planning. Revalidate immutable legacy original bytes on each use and reject corrupt archived purchase payloads before budget rebase. Tests cover generation changes, protected work, corrupt originals, reserve release after reopen and original UUID replay denial. Native source and Wiki are staged for the current public game build; source checks, guarded deployment and measured combat outcomes remain separate evidence. Dashboard assets reflect the current planning and evidence model.
+
+## Closed-history progression ownership repair — 2026-10-15T21:17:36.224127+07:00 Asia/Bangkok
+
+Refresh authenticated native equipment readback before reduced optional work, retain ownership/payment/protected-work guards and expose exact proof/session/generation blockers to planning. Revalidate immutable legacy original bytes on each use and reject corrupt archived purchase payloads before budget rebase. Tests cover generation changes, protected work, corrupt originals, reserve release after reopen and original UUID replay denial. Native source and Wiki are staged for the current public game build; source checks, guarded deployment and measured combat outcomes remain separate evidence. Dashboard assets reflect the current planning and evidence model.
+
 ## Preserve verified pre-dispatch cancellation — 2026-10-15T18:34:08.946469+07:00 Asia/Bangkok
 
 Keep verified cancellation terminal after a trade deadline. Resolve superseded histories through bilateral original journals and fresh owned native readbacks, preserving SHA-256 archives and permanent original UUID fences. Missing, corrupt or contradictory evidence remains quarantined; a resolution does not manufacture a successful transfer receipt. Include structured refinement budget failure evidence.
