@@ -2,7 +2,7 @@
 const {FOCUSES}=require('../character-brain');
 const actionable=a=>['review_route','recover'].includes(a)||Object.hasOwn(FOCUSES,a);
 function ownerBusy(instance){return /^(tw|dx|gd|pv)/.test(instance.livePos?.room||instance.lastSave?.mapId||'')||!!(instance.dailyTeamPending||instance.dailyWorkStatus?.ownsNavigation||instance.v2?.trial?.active()||require('./team-trade').blocksNavigation(instance)||instance.choresBusy||instance.teamControl||instance.recycling||instance.pendingTravel);}
-function eligible(command,instance,now=Date.now(),{queueOnly=false}={}) {
+function eligible(command,instance,now=Date.now(),{queueOnly=false,consume=false}={}) {
   const defer=queueOnly&&Object.hasOwn(FOCUSES,command?.action);
   if(!command||!actionable(command.action)||typeof command.id!=='string'||!Number.isFinite(command.expiresAt)||command.expiresAt<now)return 'คำสั่งหมดอายุหรือไม่รองรับ';
   if(command.actorId&&command.actorId!==instance.actorIdentity?.actorId)return 'คำแนะนำเป็นของตัวละครอื่น';
@@ -16,7 +16,7 @@ function eligible(command,instance,now=Date.now(),{queueOnly=false}={}) {
     const focus=Object.hasOwn(FOCUSES,command.action);
     if(!focus&&(command.action!=='review_route'||!require('./storage-payment-scope').independent(instance,{action:'combat-gather'},now)))return 'รอ reconcile รายการเดิมก่อนเปลี่ยนแผน';
   }
-  if(instance.aiControl?.id===command.id&&instance.aiControl.state!=='deferred')return 'คำสั่งซ้ำ';
+  if(instance.aiControl?.id===command.id&&instance.aiControl.state!=='deferred'&&!(consume&&instance.aiControl.state==='queued'))return 'คำสั่งซ้ำ';
   if(now-(instance.aiActionAt||0)<300000)return 'พักการเปลี่ยนแผน 5 นาที';
   if(instance.v2?.sourceCoherence?.matches===false||!defer&&ownerBusy(instance))return 'กำลังทำงานหรือเดินทาง';
   const measuredQuiet=instance.v3?.controller?.view()?.quietMs;
@@ -25,5 +25,5 @@ function eligible(command,instance,now=Date.now(),{queueOnly=false}={}) {
   return null;
 }
 function expire(instance,now=Date.now()){const c=instance.aiPending;if(c&&Number.isFinite(c.expiresAt)&&c.expiresAt<now){instance.aiPending=null;instance.aiControl={id:c.id,actorId:c.actorId,build:c.build,action:c.action,at:now,expiresAt:c.expiresAt,state:'rejected',status:'แผนหมดอายุระหว่างรอเจ้าของงาน ต้องวางแผนจากข้อมูลใหม่',evidence:'expired_intent_not_executed',replanRequired:true};return true;}return false;}
-function accept(command,instance,now=Date.now()){return eligible(command,instance,now,{queueOnly:true});}
+function accept(command,instance,now=Date.now(),{consume=false}={}){return eligible(command,instance,now,{queueOnly:true,consume});}
 module.exports={eligible,accept,ownerBusy,expire,actionable};

@@ -2116,11 +2116,11 @@ towerQuit() { return this.socialSend('twquit'); }
     if (this.aiPending && !s.panelOpen) {
       const command = this.aiPending;
       const aiGate=require('./runtime/ai-command');
-      if(Object.hasOwn(characterBrain.FOCUSES,command.action)&&aiGate.ownerBusy(this)&&!aiGate.accept(command,this)){
+      if(Object.hasOwn(characterBrain.FOCUSES,command.action)&&aiGate.ownerBusy(this)&&!aiGate.accept(command,this,Date.now(),{consume:true})){
         this.aiControl={id:command.id,actorId:this.actorIdentity?.actorId,build:this.catalog().build,action:command.action,at:Date.now(),expiresAt:command.expiresAt,state:'deferred',status:'วางแผนไว้แล้ว รอเจ้าของงานปัจจุบันจบก่อนตรวจและใช้',evidence:'intent_queued_owner_preserved_not_upgrade'};
       }else{
       this.aiPending = null;
-      const rejected = aiGate.eligible(command, this);
+      const rejected = aiGate.eligible(command, this,Date.now(),{consume:true});
       this.aiControl = { id: command.id, actorId:this.actorIdentity?.actorId, build:this.catalog().build, action: command.action, at: Date.now(), state:rejected?'rejected':'applying', status: rejected || 'กำลังดำเนินการ' };
       if (!rejected) {
         try {
