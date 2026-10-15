@@ -21,6 +21,7 @@ function estimate(i,name,args){
 // builds. Only the claim currently executing inside the scheduler is excluded.
 function heldResources(i){const held={...(i.v2?.reservations?.totals(i.catalog().build,i.activeResourceClaim?.id)||{})};if(i.actorIdentity?.actorId)for(const[k,n]of Object.entries(i.registryV32?.store?.held(i.actorIdentity.actorId)||{}))held[k]=(held[k]||0)+n;return held;}
 function preflight(i,name,args){
+ if(!require('./legacy-material-reserve').verified(i))return {allowed:false,reason:'historical reserve archive or replay fence invalid',missing:[]};
  const row=estimate(i,name,args);if(name==='craftAtExchange'&&require('./craft-scope').blocking(i,row?.targetId))return {allowed:false,reason:'original craft outcome fenced; no replay',missing:[]};if(!row)return {allowed:false,reason:'no executable paid estimate',missing:[]};
  if(name==='refineEquipped'&&require('./refine-scope').blocks(i,row.args?.[0]?.targetId))return {allowed:false,reason:'unknown refinement step or journal outcome; no replay',missing:[]};
  const cat=i.catalog(),available=inventory(i.lastSave,cat),held=heldResources(i);

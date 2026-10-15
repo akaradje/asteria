@@ -15,6 +15,10 @@ class TeamTrade{
  reconcile(sources,cat,now=Date.now(),{activityActive=false}={}){
   if(this.machine!==(this.config.coordinatorHost||'tum'))return;const members=sources.filter(s=>s.build===cat.build&&now-s.at>=-5000&&now-s.at<15000).flatMap(s=>(s.members||[]).map(m=>({...m,machine:s.machine}))),r=this.state;
   if(!terminal(r.phase)&&r.build!==cat.build){r.phase=r.phase==='GATHERING'?'CANCELLED':'UNCERTAIN';r.reason='Game build changed; stop old intent and replan';r.finishedAt=now;if(r.phase==='CANCELLED')r.evidence='not_dispatched_gathering_phase';this.save();}
+  if(!this.historyScanAt||now-this.historyScanAt>=60000){
+   this.historyScanAt=now;const found=require('./trade-outcome-recovery').discoverMixed(this.root,this.machine,members,new Set(this.quarantined.map(q=>q.id)),now);
+   if(found.length){this.quarantined.push(...found);fs.mkdirSync(path.dirname(this.quarantineFile),{recursive:true});fs.writeFileSync(this.quarantineFile+'.tmp',JSON.stringify(this.quarantined));fs.renameSync(this.quarantineFile+'.tmp',this.quarantineFile);}
+  }
   let recovered=false;
   for(const q of this.quarantined.filter(q=>q.resolution==='unresolved_no_replay')){
    if(require('./material-budget-recovery').resolve(this.root,q,members,this.machine,cat.build,now)){recovered=true;continue;}
@@ -41,13 +45,20 @@ class TeamTrade{
     r.phase='CANCELLED';r.finishedAt=now;r.evidence='both_durable_actor_journals_no_server_commands';r.reason='Both original actors proved no trade command was dispatched; replan from fresh wallets';this.save();return;
    }
   }
+  if(r.phase==='CANCELLED'&&r.id){
+   const pair=[r.offer?.donor,r.offer?.receiver].map(n=>members.find(m=>m.charName===n)?.teamTradeStatus);
+   if(pair.some(a=>a?.id===r.id&&(a.confirmationSent||['CONFIRM_SENT','VERIFYING','CONFIRMED','UNCERTAIN'].includes(a.phase)))){
+    const hash=require('./material-budget-recovery').preserve(this.root,{version:1,kind:'mixed_trade_terminal',original:JSON.parse(JSON.stringify(r)),replayBlocked:true});
+    r.previousOutcome={phase:r.phase,reason:r.reason,finishedAt:r.finishedAt,originalSha256:hash};r.phase='UNCERTAIN';r.reason='Mixed confirmation and cancellation; reconcile both original actors, no replay';r.finishedAt=now;this.preserveUncertain(now);this.save();return;
+   }
+  }
   if(terminal(r.phase)){if(activityActive)return;const cooldown=r.phase==='CONFIRMED'&&r.receiptId!=null&&['matching_server_trade_receipts_and_both_outgoing_saves','matching_server_trade_receipts_and_both_native_inventory_proofs'].includes(r.evidence)?15000:120000;if(now-(r.finishedAt||0)<cooldown)return;const unresolved=this.quarantined.filter(q=>q.resolution==='unresolved_no_replay');const eligible=unresolved.length?members.filter(m=>{const a=m.tradeAvailability;return a?.clear===true&&now-a.at>=-5000&&now-a.at<30000&&now-m.lastSaveAt>=-5000&&now-m.lastSaveAt<30000;}):members;const offer=rules.choose(eligible,{...cat,root:this.root},now,unresolved.map(q=>q.offer));if(!offer)return;this.state={id:crypto.randomUUID(),offer,build:cat.build,phase:'GATHERING',at:now,startedAt:now,deadline:now+600000};this.save();return;}
   const pair=[r.offer.donor,r.offer.receiver].map(name=>members.find(m=>m.charName===name));if(now>=r.deadline){r.phase=r.phase==='GATHERING'?'CANCELLED':'UNCERTAIN';r.reason=r.phase==='CANCELLED'?'Gathering deadline before server session; replan':'Trade deadline; inspect server and both inventories before any retry';r.finishedAt=now;if(r.phase==='CANCELLED')r.evidence='not_dispatched_gathering_phase';this.save();return;}
   const acks=pair.map(m=>m?.teamTradeStatus).filter(a=>a?.id===r.id&&now-a.at<30000);
-  if(acks.some(a=>a.phase==='CANCELLED'||a.phase==='UNCERTAIN')){r.phase=acks.some(a=>a.phase==='UNCERTAIN')?'UNCERTAIN':'CANCELLED';r.reason=acks.find(a=>a.reason)?.reason;r.finishedAt=now;}
+  if(acks.some(a=>a.phase==='CANCELLED'||a.phase==='UNCERTAIN')){r.phase=acks.some(a=>a.phase==='UNCERTAIN'||a.confirmationSent||['CONFIRM_SENT','VERIFYING','CONFIRMED'].includes(a.phase))?'UNCERTAIN':'CANCELLED';r.reason=acks.find(a=>a.reason)?.reason;r.finishedAt=now;}
   else if(acks.length===2&&acks.every((a,n)=>a.phase==='CONFIRMED'&&a.nativeInventoryProof?.actorId===pair[n]?.identity?.actorId&&a.nativeInventoryProof?.rev>=0&&a.nativeInventoryProof.at>=r.startedAt&&now>=a.nativeInventoryProof.at&&now-a.nativeInventoryProof.at<30000)&&sameSession(acks[0].receiptId,acks[1].receiptId)){r.phase='CONFIRMED';r.receiptId=acks[0].receiptId;r.evidence='matching_server_trade_receipts_and_both_native_inventory_proofs';r.finishedAt=now;}
   else if(r.phase==='GATHERING'&&acks.length===2&&acks.every(a=>a.phase==='READY')&&pair.every(m=>m.livePos?.room==='town'&&now-m.livePos.at<10000)&&Math.hypot(pair[0].livePos.x-pair[1].livePos.x,pair[0].livePos.z-pair[1].livePos.z)<8){r.phase='SESSION';r.deadline=Math.min(r.deadline,now+120000);}
-  r.at=now;this.save();
+  if(r.phase==='UNCERTAIN')this.preserveUncertain(now);r.at=now;this.save();
  }
  view(){return {...this.state,blockedMaterials:[...new Set(this.quarantined.filter(q=>q.offer?.kind==='material'&&q.resolution==='unresolved_no_replay').map(q=>q.offer.name))],quarantineCount:this.quarantined.length,quarantined:this.quarantined.slice(-8).map(q=>({id:q.id,offer:q.offer,reason:q.reason,resolution:q.resolution,quarantinedAt:q.quarantinedAt}))};}
 }
@@ -135,15 +146,28 @@ function cancelUncommittedForSpace(i,now=Date.now()){
 }
 function protocolActive(i,now=Date.now()){const r=i.teamTradeIntent;return !!(r?.offer&&r.build===i.catalog().build&&[r.offer.donor,r.offer.receiver].includes(i.character?.name)&&!terminal(r.phase)&&(r.phase==='SESSION'||i.tradeJournal?.sessionId));}
 function cleanupPending(i){const r=i.teamTradeIntent,j=i.tradeJournal;return !!(r?.offer&&['UNCERTAIN','CANCELLED'].includes(r.phase)&&r.build===i.catalog().build&&[r.offer.donor,r.offer.receiver].includes(i.character?.name)&&j?.id===r.id&&j.sessionId&&!j.sent?.cancel);}
+async function observeNativeOutcome(i,persistRow=persist){
+ const r=i.tradeJournal;if(!r?.sessionId||!r.offer||!r.context||r.phase==='CONFIRMED'||!['CONFIRM_SENT','VERIFYING','UNCERTAIN','CANCELLED'].includes(r.phase)||r.context.actorId!==i.actorIdentity?.actorId||r.context.sessionStartedAt!==i.bagSessionStartedAt||r.context.generation!==i.socialInbox?.generation||r.build!==i.catalog().build||i.registryV32?.store?.validateOwner(i.actorOwner)!==true)return false;
+ const intent={id:r.id,offer:r.offer,build:r.build,startedAt:r.at},done=await i.socialLast('trdone'),closed=await i.socialLast('trclosed');
+ const exact=receiptMatches(done,r,intent,i.character.name);
+ if(!exact&&(!sameSession(closed?.id,r.sessionId)||closed._receivedAt<r.at))return false;
+ require('./trade-outcome-recovery').archive(i,r);
+ if(exact){r.doneAt=done._receivedAt;r.receipt={id:done.id,rev:done.rev,at:done._receivedAt,validatedExactOffer:true,with:done.with,gave:done.gave,got:done.got};r.phase='VERIFYING';const p=inventoryProof(i,r,intent);if(p){r.after=p.after;r.afterAt=p.at;r.nativeInventoryProof=p;r.phase='CONFIRMED';}r.reason='Original native receipt observed after coordinator termination; no replay';}
+ else {r.nativeCloseEvidence={id:closed.id,at:closed._receivedAt,reason:closed.reason,confirmationSent:!!r.sent?.confirm};r.phase=r.sent?.confirm?'UNCERTAIN':'CANCELLED';r.reason='Original native session closed; preserve confirmation uncertainty, no replay';}
+ persistRow(i);return true;
+}
 function refineMaterialBudget(i,intent){
  const o=intent.offer;if(o?.goalKind!=='refine')return true;
- if(!i.lastSaveAt||Date.now()-i.lastSaveAt>30000||o.kind!=='material'||!Number.isSafeInteger(o.quantity)||o.quantity<=0||typeof o.goalId!=='string'||!i.catalog().items[o.goalId])return false;
- const work=require('../planning/team-workboard').project(i),m={teamWork:work,teamInventory:{materials:i.lastSave?.materials||{}}};
+ if(o.kind!=='material'||!Number.isSafeInteger(o.quantity)||o.quantity<=0||typeof o.goalId!=='string'||!i.catalog().items[o.goalId])return false;
+ const frozen=require('./trade-material-budget').frozen(i,intent);
+ if(!frozen&&(!i.lastSaveAt||Date.now()-i.lastSaveAt>30000))return false;
+ const work=frozen?.work||require('../planning/team-workboard').project(i),m={teamWork:work,teamInventory:{materials:frozen?.materials||i.lastSave?.materials||{}}};
  if(i.character.name===o.donor)return !i.lastSave?.locks?.includes(o.name)&&(i.lastSave?.materials?.[o.name]||0)-require('../planning/team-workboard').ownKeep(m,o.name)>=o.quantity;
  const need=work.needs.find(n=>n.kind==='refine'&&n.goalId===o.goalId&&n.name===o.name);return !!need&&need.want-require('../planning/team-workboard').available(m,o.name)>=o.quantity;
 }
 async function tick(i,screen){
- if(i.character?.name&&i.root&&!i.tradeJournal){try{const name=crypto.createHash('sha256').update(i.character.name).digest('hex').slice(0,24),latest=path.join(i.root,'logs/trades',name+'.json'),saved=JSON.parse(fs.readFileSync(latest));if(/^[a-zA-Z0-9-]{1,80}$/.test(saved.id||'')&&['VERIFYING','UNCERTAIN','CONFIRMED'].includes(saved.phase)){i.tradeJournal=saved;i.tradeJournalFile=path.join(i.root,'logs/trades',name,saved.id+'.json');i.tradeJournalLatest=latest;}}catch{}}
+ if(i.character?.name&&i.root&&!i.tradeJournal){try{const name=crypto.createHash('sha256').update(i.character.name).digest('hex').slice(0,24),latest=path.join(i.root,'logs/trades',name+'.json'),saved=JSON.parse(fs.readFileSync(latest));if(/^[a-zA-Z0-9-]{1,80}$/.test(saved.id||'')&&['VERIFYING','UNCERTAIN','CONFIRMED','CONFIRM_SENT'].includes(saved.phase)){i.tradeJournal=saved;i.tradeJournalFile=path.join(i.root,'logs/trades',name,saved.id+'.json');i.tradeJournalLatest=latest;}}catch{}}
+ if(i.tradeJournal)await observeNativeOutcome(i,persist);
  if(i.tradeJournal)await require('./trade-outcome-recovery').reconcile(i,{persist,ownsSession});
  if(i.character?.name&&i.root)await require('./trade-outcome-recovery').history(i,{persist,ownsSession});
 
@@ -183,7 +207,7 @@ async function tick(i,screen){
    if(!r.baselineFlushAt){r.baselineFlushAt=Date.now();persist(i);await i.eval('(async()=>{const n=window.AsteriaNet;if(!n?.isConnected?.()||n.pause||n.fixed||n.kicked)return false;n.handlers.resave();await n.flush();return true;})()');return 'trade Copper: flushing native wallet before session';}
    if(i.lastSaveAt<=r.baselineFlushAt)return 'trade Copper: waiting for fresh native wallet baseline';
   }
-  r.before=quantity(i.lastSave,intent.offer);return finish('READY');
+  r.before=quantity(i.lastSave,intent.offer);require('./trade-material-budget').capture(i,intent);return finish('READY');
  }
  const done=await frame('trdone'),closed=await frame('trclosed');if(closed&&sameSession(closed.id,r.sessionId))return finish('CANCELLED','server closed trade: '+closed.reason);
  if(done&&r.sent.confirm&&done._receivedAt>=r.confirmAt&&!receiptMatches(done,r,intent,name))return finish('UNCERTAIN','server receipt differs from registered partner and exact offers');
@@ -215,4 +239,4 @@ async function tick(i,screen){
  if(state.me.locked&&state.them.locked&&!state.me.confirmed&&!r.sent.confirm){r.sent.confirm=true;r.confirmAt=Date.now();r.phase='CONFIRM_SENT';persist(i);await i.socialSend('trconfirm');return 'trade confirm sent; awaiting server receipt';}
  return 'trade waiting for matching receipt';
 }
-module.exports={TeamTrade,tick,refineMaterialBudget,quantity,protocolActive,cleanupPending,ownsSession,receiptMatches,inventoryProof,reconcileUnsentCancellation,noDispatch,blocksNavigation,releaseIdleNavigation,protocolLease,reconcileIdleHistory,reconcileClosedCancellation,recordedMaterialConfirmation,reconcileRecordedConfirmation,cancelUncommittedForSpace};
+module.exports={observeNativeOutcome,TeamTrade,tick,refineMaterialBudget,quantity,protocolActive,cleanupPending,ownsSession,receiptMatches,inventoryProof,reconcileUnsentCancellation,noDispatch,blocksNavigation,releaseIdleNavigation,protocolLease,reconcileIdleHistory,reconcileClosedCancellation,recordedMaterialConfirmation,reconcileRecordedConfirmation,cancelUncommittedForSpace};

@@ -25,7 +25,7 @@ function archive(i,r){
  r.readbackRecovery={originalHash:hash,originalPhase:r.phase,originalContext:{...r.context},replayed:false};
 }
 async function reconcile(i,{persist,ownsSession},now=Date.now()){
- const r=i.tradeJournal;if(!r||!['VERIFYING','UNCERTAIN','CONFIRMED'].includes(r.phase)||!eligible(i,r,now))return false;
+ const r=i.tradeJournal;if(!r||!['VERIFYING','UNCERTAIN','CONFIRMED','CONFIRM_SENT','CANCELLED'].includes(r.phase)||!eligible(i,r,now))return false;
  if(recorded(r,i.character.name)){persist(i);return false;}
  if(i.tradeReadbackFlight||!i.canDo?.('recordedTradeReadback',30000)||await ownsSession(i))return false;
  const receipt=r.receipt,captured=receipt?.id!=null&&Number.isSafeInteger(receipt.rev)&&Number.isFinite(r.doneAt)&&r.doneAt===receipt.at&&Number.isFinite(r.confirmAt)&&r.confirmAt>=r.at&&r.doneAt>=r.confirmAt&&r.sent?.confirm===true;
@@ -49,6 +49,7 @@ async function history(i,helpers,now=Date.now()){
   const name=crypto.createHash('sha256').update(i.character.name).digest('hex').slice(0,24),file=path.join(i.root,'logs/trades',name,q.id+'.json');let r;try{r=JSON.parse(fs.readFileSync(file));}catch{continue;}
   if(!r.offer||r.offer.donor!==q.offer.donor||r.offer.receiver!==q.offer.receiver||r.offer.kind!==q.offer.kind||r.offer.name!==q.offer.name||r.offer.quantity!==q.offer.quantity)continue;
   const actor=Object.assign(Object.create(i),{tradeJournal:r,tradeJournalFile:file,tradeJournalLatest:null,canDo:i.canDo?.bind(i)});
+  await require('./team-trade').observeNativeOutcome(actor,helpers.persist);
   await reconcile(actor,helpers,now);
   if(actor.teamTradeStatus)updateRecoveredStatus(i,actor.teamTradeStatus);
  }
@@ -61,4 +62,21 @@ function updateRecoveredStatus(i,status){
  i.tradeRecoveredOutcomes=[leaf(status),...(i.tradeRecoveredOutcomes||[]).filter(r=>r.id!==status.id).map(leaf)].slice(0,16);
  i.teamTradeStatus={...i.teamTradeStatus,recoveredOutcomes:i.tradeRecoveredOutcomes};
 }
-module.exports={recorded,eligible,proof,reconcile,history,updateRecoveredStatus};
+function discoverMixed(root,host,members,known,now=Date.now()){
+ const names=require('../planning/host-team-scope').team(root,host)?.members.map(m=>m.charName)||[],pairs=new Map();
+ for(const m of members.filter(m=>m.machine===host&&names.includes(m.charName))){
+  const dir=path.join(root,'logs/trades',crypto.createHash('sha256').update(m.charName).digest('hex').slice(0,24));let files;try{files=fs.readdirSync(dir);}catch{continue;}
+  for(const f of files){if(!/^[a-f0-9-]{36}\.json$/.test(f))continue;let r;try{r=JSON.parse(fs.readFileSync(path.join(dir,f)));}catch{continue;}
+   if(known.has(r.id)||!r.offer||r.context?.actorId!==m.identity?.actorId||r.offer.donor===r.offer.receiver||![r.offer.donor,r.offer.receiver].every(n=>names.includes(n))||!Number.isFinite(r.deadline)||now<r.deadline)continue;
+   const pair=pairs.get(r.id)||[];pair.push({name:m.charName,row:r});pairs.set(r.id,pair);
+  }
+ }
+ const found=[];
+ for(const [id,pair]of pairs){if(pair.length!==2||pair[0].name===pair[1].name)continue;const a=pair[0].row,b=pair[1].row;
+  if(JSON.stringify(a.offer)!==JSON.stringify(b.offer)||!pair.some(x=>x.row.sent?.confirm)&&!pair.some(x=>x.row.phase==='UNCERTAIN')||!pair.some(x=>x.row.phase==='CANCELLED')||pair.every(x=>x.row.phase==='CANCELLED'&&x.row.nativeCloseEvidence))continue;
+  const hash=require('./material-budget-recovery').preserve(root,{version:1,kind:'mixed_trade_history',original:pair,replayBlocked:true});
+  found.push({id,offer:a.offer,build:a.build,phase:'UNCERTAIN',at:now,startedAt:Math.min(a.at,b.at),deadline:Math.max(a.deadline,b.deadline),finishedAt:now,quarantinedAt:now,resolution:'unresolved_no_replay',reason:'Original mixed terminal actor journals require both-side reconciliation',originalSha256:hash,replayBlocked:true});
+ }
+ return found;
+}
+module.exports={discoverMixed,archive,recorded,eligible,proof,reconcile,history,updateRecoveredStatus};

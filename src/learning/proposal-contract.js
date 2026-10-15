@@ -3,6 +3,7 @@ const crypto=require('node:crypto');
 const digest=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex').slice(0,20);
 function facts(m){
  const scope=m.actorId||'legacy-slot:'+m.slot,values={identity:{actorId:m.actorId,build:m.build},observation:{saveAgeSeconds:m.saveAgeSeconds,status:m.status},goal:m.currentGoal||null,budget:{reserve:m.personalBrain?.reserve??null,coins:m.personalBrain?.coins??null},progress:m.measuredProgress||null,milestones:m.personalBrain?.milestones||null};
+ if(m.budgetBreakdown)values.budgetBreakdown=m.budgetBreakdown;
  if(m.equipmentExecution)values.equipmentExecution=m.equipmentExecution;
  if(m.executionGates)values.executionGates=m.executionGates;
  if(m.paymentRecovery)values.paymentRecovery=m.paymentRecovery;

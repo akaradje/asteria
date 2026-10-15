@@ -20,6 +20,8 @@ function evidence(i,id,now=Date.now()){
  return {version:2,kind:'new_budgeted_refine_intent',at:now,targetId:id,from:i.serverSaveReceipt.state.refine[id]??0,proof:{...i.serverSaveReceipt.proof},nativeBudget:{coins:i.serverSaveReceipt.state.coins,materials:{...i.serverSaveReceipt.state.materials}},originalTransactionIds:[...old.map(r=>r.id),...legacy.flatMap(r=>[r.id,r.id.replace(/^development:/,'')])],historyTransactionIds:legacy.map(r=>r.id),historyArchives,historicalSuccessKnown:false,historicalCostKnown:false,replayed:false};
 }
 function dispatch(i,row,step,now=Date.now(),continuation=false){
+ if([row?.id,i.activeResourceClaim?.id,i.activeDevelopmentAttempt?.id].some(id=>require('./legacy-material-reserve').blocked(i,id)))return false;
+ if(!require('./legacy-material-reserve').verified(i))return false;
  const e=row?.freshNativeIntent;
  if(!e)return true;
  return e.version===2&&e.kind==='new_budgeted_refine_intent'&&Array.isArray(e.originalTransactionIds)&&row.id!==undefined&&!e.originalTransactionIds.includes(row.id)&&e.targetId===step.id&&e.from===step.from&&require('./refine-history-archive').verified(i,e)&&row.context?.actorId===e.proof.actorId&&row.context?.build===e.proof.build&&row.context?.sessionStartedAt===e.proof.sessionStartedAt&&row.context?.generation===e.proof.generation&&allowed(i,step.id,now,continuation?row:null);

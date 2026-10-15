@@ -1,3 +1,11 @@
+## Native trade budget leases and historical reserve rebases — 2026-10-15T16:29:51.674329+07:00 Asia/Bangkok
+
+Use an authenticated pre-session budget with fresh exact native offers inside a bounded lease, retaining owner/build/generation and reserve checks. Process terminal receipt and close events even after coordinator completion, and preserve mixed confirm/cancel histories for reconciliation.
+
+Rebase individually archived old ore claims using current authenticated server balances. SHA-256 originals and permanent claim/transaction UUID fences precede reserve release; unknown historic cost/outcome stay unknown. AI separates historical holds, current transactions, next craft and next refinement budgets.
+
+Windows offline154 and protected-boundary11 checks passed. Added regression coverage for delayed saves, receipt/close order, late receipts, missing ledgers, damaged archives and no-replay. Production load/readback is verified separately from source publication.
+
 ## Closed material budget recovery and separate refinement requests — 2026-10-15T14:45:44.036206+07:00 Asia/Bangkok
 
 Orphan legacy craft reservations can rebase current material budgets only after fresh authenticated ownership, closed old session, idle dispatchers, an exact verified native recipe bill, and an immutable original archive. Historical success and cost remain unknown; original UUIDs remain blocked across restart.

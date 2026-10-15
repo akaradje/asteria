@@ -52,7 +52,7 @@ function trade(i,now=Date.now()){
  for(const q of i.teamTradeIntent?.quarantined||[]){
   if(q.resolution!=='unresolved_no_replay'||q.offer?.kind!=='material'||!i.catalog().world?.REFINE?.ORES?.includes(q.offer.name)||q.offer.donor===q.offer.receiver||!names.includes(q.offer.donor)||!names.includes(q.offer.receiver)||![q.offer.donor,q.offer.receiver].includes(i.character.name)||!uuid(q.id))continue;
   let r;try{r=JSON.parse(fs.readFileSync(tradeFile(i.root,i.character.name,q.id)));}catch{continue;}
-  if(!sameOffer(r.offer,q.offer)||!['UNCERTAIN','VERIFYING','CONFIRMED'].includes(r.phase)||r.context?.actorId!==i.actorIdentity.actorId||!Number.isSafeInteger(r.context?.generation)||!Number.isFinite(r.context?.sessionStartedAt)||r.context.sessionStartedAt>=p.sessionStartedAt||!closed(r.at,r.deadline,p,now)||!Number.isSafeInteger(q.offer.quantity)||q.offer.quantity<=0||!Object.hasOwn(i.serverSaveReceipt.state.materials,q.offer.name))continue;
+  if(!sameOffer(r.offer,q.offer)||!['UNCERTAIN','VERIFYING','CONFIRMED','CONFIRM_SENT','CANCELLED'].includes(r.phase)||r.context?.actorId!==i.actorIdentity.actorId||!Number.isSafeInteger(r.context?.generation)||!Number.isFinite(r.context?.sessionStartedAt)||r.context.sessionStartedAt>=p.sessionStartedAt||!closed(r.at,r.deadline,p,now)||!Number.isSafeInteger(q.offer.quantity)||q.offer.quantity<=0||!Object.hasOwn(i.serverSaveReceipt.state.materials,q.offer.name))continue;
   const prior=readCert(i.root,i.actorIdentity.actorId,q.id);
   let hash=prior?.originalSha256;
   if(hash&&!original(i.root,hash))throw Error('Material trade archive missing');
@@ -82,6 +82,6 @@ function resolve(root,q,members,host,build,now=Date.now()){
 function replayBlocked(i,id){if(!uuid(id)||!/^actor-[a-f0-9]{32}$/.test(i.actorIdentity?.actorId||'')||!i.root)return false;return fs.existsSync(certFile(i.root,i.actorIdentity.actorId,id));}
 function tick(i,now=Date.now()){
  if(!gate(i,now)||now-(i.materialBudgetRecovery?.at||0)<10000)return false;
- try{const reservations=reserve(i,now),trades=trade(i,now);i.materialBudgetRecovery={at:now,reservations,trades,replayBlocked:true};return reservations+trades>0;}catch{i.materialBudgetRecovery={at:now,state:'blocked_archive_or_proof',replayBlocked:true};return false;}
+ try{const reservations=reserve(i,now)+require('./legacy-material-reserve').recover(i,now),trades=trade(i,now);i.materialBudgetRecovery={at:now,reservations,trades,replayBlocked:true};return reservations+trades>0;}catch{i.materialBudgetRecovery={at:now,state:'blocked_archive_or_proof',replayBlocked:true};return false;}
 }
-module.exports={gate,closed,preserve,original,reserve,trade,resolve,readCert,validCertificate,replayBlocked,tick};
+module.exports={certificate,gate,closed,preserve,original,reserve,trade,resolve,readCert,validCertificate,replayBlocked,tick};
