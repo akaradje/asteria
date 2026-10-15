@@ -1,3 +1,9 @@
+## Guarded six-character rollout verified — 2026-10-15T23:23:35.872265+07:00 Asia/Bangkok
+
+The repaired application is loaded on both registered remote hosts with six native actor/build/session/generation readbacks, coherent native751aed14 data and fresh saves. Host AI checks5/5 each; AI enabled on both with zero recorded failures at acceptance. Windows farm/controller/machine untouched. Full frozen Windows156/156 and isolated Linux156/156, protected safety11 unchanged, public21/21 and15 narrow private incident-admission fixtures pass.
+
+Current budgets were rebased only after fresh authenticated native readback. Immutable original purchase/refinement histories remain UNKNOWN where historical cost/success is unproven; original transaction/claim UUID no-replay stays binding. All663 pre-existing immutable original files still match their captured SHA. Temporary AI admission pause used to drain outdated source-review work was restored and its original settings verified. Eight independently budgeted refinement attempts reached native settlement but did not increase levels; spending is not reported as power improvement. An earlier native boot refinement was confirmed separately. Operational receipts and private per-character learning remain on their owning hosts.
+
 ## Exact native recipe data and closed-history progression recovery — 2026-10-15T22:47:44.261097+07:00 Asia/Bangkok
 
 Preserve plain World constants such as MAX_LV in the JSON-cloned recipe sandbox, with native host functions excluded and unapproved calls rejected. Wing regression compares every native recipe ID, cost and level, including newly added wings, instead of a fixed count. Exact native payment, fresh actor/build/session/generation proof, reserves, immutable archived UNKNOWN history and original UUID no-replay remain binding. This complements exact metadata-suffixed build identity and boot-query hashes.
