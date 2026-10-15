@@ -1,3 +1,11 @@
+## Native-target release verification — 2026-10-15T12:11:06.031094+07:00 Asia/Bangkok
+
+Final source passed all152 offline suites on Windows and all152 in the isolated Linux sandbox, with no source/build drift. Protected boundary safety PASS; explicit sanitized public fixtures13/13 PASS. Native encounter attribution and routing-independent combat loadout regression are included. Live acceptance is tracked separately; offline results do not prove measured combat improvement. No runtime data, credentials, game source artifacts or private actor identities are published.
+
+## Native combat encounter attribution — 2026-10-15T12:05:01.165448+07:00 Asia/Bangkok
+
+Combat evidence now derives monster species from connection-bound native room spawn/hit frames and excludes unattributed or other-species outgoing damage from per-target samples. Planner routing changes cannot masquerade as loadout changes; actual combat modifiers remain part of the signature. Telemetry version3 isolates changed attribution semantics. Added frame/observe regression coverage for planner oscillation, room snapshots before position changes, generation isolation, and actual equipment changes. Explicit public offline suite13/13 PASS. Full source Windows/Linux verification is in progress; this entry does not claim deployment or native improvement. Transaction no-replay, ownership and human-stop boundaries unchanged.
+
 ## Combat telemetry and strategic continuity repair — 2026-10-15T11:47:17.810535+07:00 Asia/Bangkok
 
 Separates scaled-instance received-hit distribution/HP drain from unverified base-ATK mitigation estimates. Adds120-second/30-kill/200-hit micro observations and non-overlapping exact-context aggregates with five active minutes for comparisons. Separates solo sustain from two/three-person nearby party support with recipient exposure denominators; cohort changes cannot qualify paid support comparisons. Preserves raw history and no-replay evidence.
