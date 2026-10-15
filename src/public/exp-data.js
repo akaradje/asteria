@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'../..'),cached=new Map(),pending=new Map();
 function progress(row,build,{now=Date.now(),snapshotAt,world}={}){
  const unknown=reason=>({status:'unknown',reason});
  if(!row||!Number.isInteger(row.lv)||row.lv<1||!Number.isFinite(row.exp)||row.exp<0)return unknown('รอค่า EXP จากเซฟ');
- if(typeof build!=='string'||! /^[a-zA-Z0-9_-]+$/.test(build))return unknown('รอรุ่นเกมของเซฟ');
+ if(typeof build!=='string'||! /^[a-zA-Z0-9_-]+(?:\+[a-zA-Z0-9_-]+)?$/.test(build))return unknown('รอรุ่นเกมของเซฟ');
  if(!world){try{world=require('../economy').loadCatalog(root,build).world;}catch{}}
  if(!Number.isInteger(world?.MAX_LV)||world.MAX_LV<1||row.lv>world.MAX_LV)return unknown('รอสูตร EXP ของเกมรุ่นนี้');
  const at=row.lastSaveAt,envelope=typeof snapshotAt==='string'?Date.parse(snapshotAt):snapshotAt;

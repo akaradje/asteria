@@ -52,7 +52,7 @@ class GameKnowledge {
     }catch(e){this.state.systemVersionError=e.message;this.state.systemVersion=null;}
   }
   previousSources(snapshot){
-    if(!/^[\w-]{1,100}$/.test(snapshot?.id||''))return null;
+    if(!require('./knowledge/build-id').valid(snapshot?.id,100))return null;
     const result={};for(const [key,file]of Object.entries({html:'client.html',world:'world.js',network:'network.js',wiki:'wiki.json'})){try{const text=fs.readFileSync(path.join(this.dir,snapshot.id,file),'utf8');if(text.length<=8000000)result[key]=key==='wiki'?JSON.parse(text):text;}catch{}}
     return result;
   }
@@ -70,7 +70,7 @@ class GameKnowledge {
     try {
       const origin='https://asteria-online.io';
       const h=JSON.parse(await this.text(origin+'/api/health'));
-      if(!h.ok||typeof h.build!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(h.build))throw Error('invalid health build');
+      if(!h.ok||typeof h.build!=='string'||!require('./knowledge/build-id').valid(h.build))throw Error('invalid health build');
       this.state.checkedAt=this.now();this.state.liveBuild=h.build;this.state.loadedBuild=loadedBuild;
       this.state.updatePending=!!loadedBuild&&h.build!==loadedBuild;
       // Collect reference material independently from approving it for live actions.

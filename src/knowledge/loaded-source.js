@@ -5,7 +5,7 @@ const hash=text=>crypto.createHash('sha256').update(text).digest('hex');
 function capture(root,build){
  const sourceHashes={},missing=[];
  for(const[k,name]of Object.entries(files)){
-  if(!/^[a-zA-Z0-9_-]{1,80}$/.test(build||'')){missing.push(k);continue;}
+  if(!require('./build-id').valid(build)){missing.push(k);continue;}
   const file=path.join(root,'cache',build,'asteria-online.io',name);
   try{const stat=fs.statSync(file),key=path.resolve(file),stamp=[stat.size,stat.mtimeMs,stat.ctimeMs].join(':'),prior=cache.get(key);let sha;
    if(prior?.stamp===stamp)sha=prior.sha;else{sha=hash(fs.readFileSync(file,'utf8'));cache.set(key,{stamp,sha});while(cache.size>48)cache.delete(cache.keys().next().value);}

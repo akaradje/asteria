@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const id=require('../src/knowledge/build-id'),release=require('../src/runtime/fleet-client-release');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-build-metadata-')),build='200b7fc6+cf',origin='https://asteria-online.io';
+for(const b of ['200b7fc6',build,'fixture-build','abc_123'])assert(id.valid(b));
+assert(id.hashBuild(build));assert(!id.hashBuild('fixture+cf'));
+for(const b of ['../x','a/b','a\\b','..','a%2fb','a++b','+cf','abc+','a?b','a+b+c','a'.repeat(81),null,{}])assert(!id.valid(b),'unsafe or unbounded cache identity: '+String(b));
+const fixture=url=>{const p=new URL(url).pathname;return p==='/api/health'?JSON.stringify({ok:true,build}):p==='/'?'<!doctype html><html><script src="./asteria-world-system.js?v=patch"></script></html>':p==='/asteria-world-system.js'?'const AsteriaWorld={};':p==='/asteria-net.js'?'const AsteriaNet={};':p==='/asteria-i18n.js'?'root.__L = function(){}; root.__i18nDom = function(){};':p==='/asteria-audio.js'?'const AsteriaAudio={};':'const THREE={};';};
+(async()=>{try{
+ const fetcher=async url=>({ok:true,url:url===origin+'/'?origin+'/asteria-online-visual-polish.html':url,arrayBuffer:async()=>Uint8Array.from(Buffer.from(fixture(url))).buffer});
+ const r=await release.stage(root,{fetcher});assert.equal(r.build,build);assert.equal(release.inspect(root,{ok:true,build}).build,build);assert.throws(()=>release.inspect(root,{ok:true,build:'200b7fc6'}),/differs from live/);
+ assert(r.dependencies.some(d=>d.url===origin+'/asteria-world-system.js?v=patch'),'exact query URL is frozen for native boot');
+ const badFetcher=async url=>({...await fetcher(url),arrayBuffer:async()=>Uint8Array.from(Buffer.from(fixture(url)+(url.includes('?v=')?' changed':''))).buffer});await assert.rejects(()=>release.stage(root,{fetcher:badFetcher}),/differs from reviewed canonical/);
+ const loaded=require('../src/knowledge/loaded-source'),source=loaded.capture(root,build);assert.equal(source.missing.length,0);assert(loaded.inspect(root,build,source.sourceHashes,{liveBuild:build}).matches);
+ assert(!loaded.inspect(root,build,source.sourceHashes,{liveBuild:'200b7fc6'}).matches,'metadata is retained, never stripped or treated as a build alias');
+ assert.equal(require('../src/economy').newestBuild(root),build,'explicit exact public pin beats directory timestamps');
+ const refresh=new(require('../src/runtime/client-refresh').ClientRefresh)();assert.equal(refresh.inspect({ok:true,build},{},build,{running:true,enabled:true}).action,'none','current metadata build is a valid identity, not server unavailable');
+ const f=path.join(root,'cache',build,'asteria-online.io/asteria-net.js');fs.appendFileSync(f,' changed');assert.throws(()=>release.inspect(root,{ok:true,build}),/fingerprint mismatch/);
+ console.log('PASS exact metadata build stage/pin/cache/refresh, no alias or source-hash bypass, traversal/length/identifier negatives');
+}finally{assert(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

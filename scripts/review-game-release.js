@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),review=require('../src/learning/game-release-review');
 const request=JSON.parse(Buffer.from(process.argv[2]||'','base64').toString());
-if(!['windows','tum','vps'].includes(request.machine)||!/^[a-zA-Z0-9_-]{1,80}$/.test(request.build||''))throw Error('Registered review request required');
+if(!['windows','tum','vps'].includes(request.machine)||!require('../src/knowledge/build-id').valid(request.build))throw Error('Registered review request required');
 const folder=path.join(root,'logs/ai-system');fs.mkdirSync(folder,{recursive:true});
 const lock=path.join(folder,'review.lock'),status=path.join(folder,'review.json');let descriptor;
 function publish(stage,extra={}){require('../src/runtime/telemetry-file').writeTelemetry(status,{at:Date.now(),stage,build:request.build,...extra});}

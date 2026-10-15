@@ -1,3 +1,11 @@
+## Exact native metadata regression verified — 2026-10-15T15:05:22.519362+00:00
+
+Windows156/156, isolated Linux156/156, public21/21 and11 protected boundaries PASS. Frozen source/native identities unchanged during complete checks.724JS/9Python syntax and52 private-value comparisons PASS; staged secret scan PASS. Exact native metadata and versioned bootstrap identities remain distinct from receipts or measured combat improvement.
+
+## Preserve exact native build metadata and boot sources — 2026-10-15T21:56:29.703942+07:00 Asia/Bangkok
+
+Support bounded native deployment identifiers with a metadata suffix without stripping it or aliasing distinct builds. Retain strict cache/source hashes, actor/build/generation/ownership/payment bindings and original UUID fences. Stage exact cache-busting script URLs only when their bytes match canonical reviewed sources; query or identifier changes cannot bypass review. Offline fixtures cover full metadata identity, stage/pin/cache/refresh, traversal/length negatives and differing query bodies. Native deployment and combat outcomes are verified separately.
+
 ## Frozen progression regression PASS — 2026-10-15T21:30:54.935378+07:00 Asia/Bangkok
 
 Windows155/155, isolated Linux155/155, public20/20 and11 protected source boundaries PASS. Both complete runs preserve exact application/native source identities. Syntax/private-value and staged secret scans PASS. Deployment and native combat outcomes are verified separately.

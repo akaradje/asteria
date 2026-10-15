@@ -31,9 +31,9 @@ function read(file,maps,graph=false){
  try{const source=fs.readFileSync(file,'utf8'),key=file+':'+graph+':'+crypto.createHash('sha256').update(source).digest('hex')+':'+JSON.stringify(maps.map(m=>[m.id,m.name,m.levelMin]));if(!cache.has(key)){if(cache.size>=8)cache.clear();cache.set(key,graph?parseGraph(source,maps):parse(source,maps));}return cache.get(key);}catch{return {};}
 }
 function forBuild(root,build,maps){
- if(!/^[\w-]{1,80}$/.test(build||''))return {};
+ if(!require('../knowledge/build-id').valid(build))return {};
  return read(path.join(root,'cache',build,'asteria-online.io/asteria-online-visual-polish.html'),maps||[]);
 }
 function load(actor){return read(path.join(actor.cache.dir,'asteria-online.io/asteria-online-visual-polish.html'),require('../economy').loadWiki(actor.root)?.maps?.maps||[]);}
-function graphForBuild(root,build,maps){if(!/^[\w-]{1,80}$/.test(build||''))return {};return read(path.join(root,'cache',build,'asteria-online.io/asteria-online-visual-polish.html'),maps||[],true);}
+function graphForBuild(root,build,maps){if(!require('../knowledge/build-id').valid(build))return {};return read(path.join(root,'cache',build,'asteria-online.io/asteria-online-visual-polish.html'),maps||[],true);}
 module.exports={parse,parseGraph,load,forBuild,graphForBuild};

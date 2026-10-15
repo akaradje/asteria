@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('cry
 const cache=new Map();
 function catalog(root,build){
  const key=root+':'+build;if(cache.has(key))return cache.get(key);
- if(!/^[\w-]{1,80}$/.test(build||''))throw Error('quest build unavailable');
+ if(!require('../knowledge/build-id').valid(build))throw Error('quest build unavailable');
  const html=fs.readFileSync(path.join(root,'cache',build,'asteria-online.io/asteria-online-visual-polish.html'),'utf8');
  const version=Number(html.match(/const QUEST_VERSION\s*=\s*(\d+)/)?.[1]),a=html.indexOf('const QUESTS = ['),b=html.indexOf('\n];',a);
  if(!version||a<0||b<0)throw Error('quest schema unavailable');

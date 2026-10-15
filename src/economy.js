@@ -204,7 +204,7 @@ function newestBuild(root) {
   // Prefer the explicitly staged native release with all three bound sources.
   try {
     const pin=JSON.parse(fs.readFileSync(path.join(root,'machines/fleet-client-release.json'),'utf8'));
-    if(pin.version===1&&/^[a-f0-9]{7,64}$/.test(pin.build||'')&&pin.files?.length===3){
+    if(pin.version===1&&require('./knowledge/build-id').hashBuild(pin.build)&&pin.files?.length===3){
       const identity=require('./knowledge/loaded-source').capture(root,pin.build);
       if(!identity.missing.length&&['client','world','network'].every((key,n)=>pin.files[n].sha256===identity.sourceHashes[key]))return pin.build;
     }

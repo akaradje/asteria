@@ -216,7 +216,7 @@ function start(o) {
  */
 const controllerRecovery=new(require('./runtime/controller-recovery').ControllerRecovery)({
  allowed:()=>autoRestart&&!child&&!stopping&&!!lastOptions&&!require('./runtime/host-intent').view(ROOT,false).operatorStopped,
- revision:()=>controlRevision,probe:async()=>{const h=await api.health();return !!h&&/^[a-f0-9]{7,64}$/.test(h.build||'');},start:()=>start(lastOptions),
+ revision:()=>controlRevision,probe:async()=>{const h=await api.health();return !!h&&require('./knowledge/build-id').hashBuild(h.build);},start:()=>start(lastOptions),
  report:r=>{lastError='controller recovery: '+r.state+'; attempt '+r.attempt;console.error('panel:',lastError);}
 });
 function scheduleRestart(why){controllerRecovery.request(why);}

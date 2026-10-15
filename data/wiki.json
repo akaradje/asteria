@@ -55052,20 +55052,20 @@
   "_source": {
     "url": "https://asteria-online.io/wiki/data.json",
     "fetchedAt": 1792073483428,
-    "verifiedAt": 1792073483428,
+    "verifiedAt": 1792075471284,
     "sha256": "98c81445b58376d50f60f319ba48df50a5109212c642eb8a7d9b5ce4af10281c",
-    "verifiedBuild": "200b7fc6",
+    "verifiedBuild": "200b7fc6+cf",
     "verifiedWingRecipes": 12,
     "domains": {
       "wings": {
         "state": "READY",
-        "build": "200b7fc6",
+        "build": "200b7fc6+cf",
         "verifiedRecipes": 12,
         "reason": null
       },
       "cards": {
         "state": "DISCOVERED",
-        "build": "200b7fc6",
+        "build": "200b7fc6+cf",
         "authority": "wiki_not_runtime_outcome"
       }
     },

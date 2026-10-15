@@ -14,7 +14,7 @@ function historicalClosedPurchase(row,instance,now){
 function healthFromKnowledge(snapshot,{now=Date.now(),startedAt=0}={}){
  const at=Date.parse(snapshot?.at),k=snapshot?.gameKnowledge,c=k?.current;
  if(!startedAt||!Number.isFinite(at)||at<startedAt||now-at<0||now-at>=45000||k?.lastError)return null;
- if(!/^[\w-]{1,80}$/.test(c?.build||'')||c.build!==k.liveBuild||c.evidence!=='downloaded_client_sources'||!validHashes(c.sourceHashes))return null;
+ if(!require('../knowledge/build-id').valid(c?.build)||c.build!==k.liveBuild||c.evidence!=='downloaded_client_sources'||!validHashes(c.sourceHashes))return null;
  // current.at is the successful final health confirmation; checkedAt can be
  // advanced by a later failed/incomplete collection and cannot replace it.
  if(!Number.isFinite(c.at)||c.at<startedAt||now-c.at<0||now-c.at>=300000)return null;
@@ -28,7 +28,7 @@ function loadedBuild(snapshot,telemetry,{machine,now=Date.now(),startedAt=0}={})
  const at=Date.parse(snapshot?.at);
  if(!['windows','tum','vps'].includes(machine)||!startedAt||!Number.isFinite(at)||at<startedAt||now-at<0||now-at>=45000)return null;
  const sources=(snapshot.instances||[]).map(i=>i.runtimeV2?.loadedSourceIdentity);
- return sources.length&&sources.every(s=>/^[\w-]{1,80}$/.test(s?.build||'')&&s.build===sources[0].build&&validHashes(s.sourceHashes)&&sourceKeys.every(k=>s.sourceHashes[k]===sources[0].sourceHashes[k]))?sources[0].build:null;
+ return sources.length&&sources.every(s=>require('../knowledge/build-id').valid(s?.build)&&s.build===sources[0].build&&validHashes(s.sourceHashes)&&sourceKeys.every(k=>s.sourceHashes[k]===sources[0].sourceHashes[k]))?sources[0].build:null;
 }
 class ClientRefresh{
  constructor(state={}){this.state={attempts:[],history:[],...state};}
@@ -36,8 +36,8 @@ class ClientRefresh{
   const wait=reason=>{this.state.status='waiting';this.state.reason=reason;return {action:'wait',reason};};
   this.state.checkedAt=now;this.state.loadedBuild=loadedBuild||null;this.state.liveBuild=health?.build||null;
   if(!enabled||!running){this.state.status='inactive';return {action:'none'};}
-  if(!health?.ok||!/^[\w-]{1,80}$/.test(health.build||'')){this.state.candidate=null;return wait('server build unavailable');}
-  if(!/^[\w-]{1,80}$/.test(loadedBuild||''))return wait('fresh loaded client build required');
+  if(!health?.ok||!require('../knowledge/build-id').valid(health.build)){this.state.candidate=null;return wait('server build unavailable');}
+  if(!require('../knowledge/build-id').valid(loadedBuild))return wait('fresh loaded client build required');
   const knowledge=snapshot?.gameKnowledge,coherence=knowledge?.sourceCoherence;
   const freshSource=knowledge?.current?.build===health.build&&!knowledge.lastError&&Number.isFinite(knowledge.checkedAt)&&now-knowledge.checkedAt>=0&&now-knowledge.checkedAt<900000;
   const keys=['client','world','network'],hashes=knowledge?.current?.sourceHashes;

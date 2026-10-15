@@ -6,8 +6,8 @@ const hash=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'
 const read=file=>{try{return JSON.parse(fs.readFileSync(file));}catch{return null;}};
 function need(snapshot,now=Date.now(),serverHealth){
  const at=Date.parse(snapshot?.at),v=snapshot?.gameKnowledge?.systemVersion;
- if(Number.isFinite(at)&&now-at>=0&&now-at<=45000&&v&&serverHealth?.authority==='direct_server_health'&&serverHealth.ok===true&&/^[a-f0-9]{7,64}$/.test(serverHealth.build||'')&&Number.isFinite(serverHealth.at)&&now-serverHealth.at>=0&&now-serverHealth.at<=120000&&serverHealth.build!==v.build)return {build:serverHealth.build,key:hash([serverHealth.build,v.sourceRevision]),reason:'native_server_build_changed'};
- if(!Number.isFinite(at)||now-at<0||now-at>45000||!v?.liveFresh||!/^[a-zA-Z0-9_-]{1,80}$/.test(v.liveBuild||''))return null;
+ if(Number.isFinite(at)&&now-at>=0&&now-at<=45000&&v&&serverHealth?.authority==='direct_server_health'&&serverHealth.ok===true&&require('../knowledge/build-id').hashBuild(serverHealth.build)&&Number.isFinite(serverHealth.at)&&now-serverHealth.at>=0&&now-serverHealth.at<=120000&&serverHealth.build!==v.build)return {build:serverHealth.build,key:hash([serverHealth.build,v.sourceRevision]),reason:'native_server_build_changed'};
+ if(!Number.isFinite(at)||now-at<0||now-at>45000||!v?.liveFresh||!require('../knowledge/build-id').valid(v.liveBuild))return null;
  if(v.sourceMatches!==false&&v.wikiCurrent!==false&&v.architectureCurrent!==false)return null;
  return {build:v.liveBuild,key:hash([v.liveBuild,v.sourceRevision,snapshot.gameKnowledge.current?.sourceHashes||null]),reason:v.sourceMatches===false?'loaded_game_source_mismatch':v.wikiCurrent===false?'wiki_review_required':'current_release_review_required'};
 }
@@ -15,7 +15,7 @@ class SystemRecovery{
  constructor(root,machine,{launch,now=Date.now}={}){this.root=root;this.machine=machine;this.now=now;this.launch=launch;this.busy=false;this.file=path.join(root,'logs/ai-system/controller.json');this.state=read(this.file)||{attempts:[],history:[]};}
  save(){fs.mkdirSync(path.dirname(this.file),{recursive:true});require('../runtime/telemetry-file').writeTelemetry(this.file,this.state);}
  view(){return {...this.state,busy:this.busy,worker:read(path.join(this.root,'logs/ai-system/review.json'))};}
- observeServerHealth(health){if(health?.ok===true&&/^[a-f0-9]{7,64}$/.test(health.build||'')){this.state.serverHealth={authority:'direct_server_health',ok:true,build:health.build,at:this.now()};this.save();}}
+ observeServerHealth(health){if(health?.ok===true&&require('../knowledge/build-id').hashBuild(health.build)){this.state.serverHealth={authority:'direct_server_health',ok:true,build:health.build,at:this.now()};this.save();}}
  async tick({enabled,farm}={}){
   const now=this.now();if(!enabled||!farm?.ready){return {...this.view(),mode:'inactive'};}
   const snapshot=read(path.join(this.root,'logs/status.json')),task=need(snapshot,now,this.state.serverHealth);if(!task){

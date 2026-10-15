@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),tables=new Map();
 function quantileRate(rows,q){const rates=rows.filter(r=>r.ms>0&&Number.isFinite(r.used)&&r.used>=0).map(r=>r.used*60000/r.ms).sort((a,b)=>a-b);return rates.length?rates[Math.min(rates.length-1,Math.ceil(rates.length*q)-1)]:0;}
 function prices(i){
  const build=i.catalog().build,key=i.root+':'+build;if(tables.has(key))return tables.get(key);
- if(!/^[\w-]{1,80}$/.test(build||''))return [];
+ if(!require('../knowledge/build-id').valid(build))return [];
  const html=fs.readFileSync(path.join(i.root,'cache',build,'asteria-online.io/asteria-online-visual-polish.html'),'utf8');
  const rows=['Red Potion','Orange Potion','Yellow Potion','White Potion'].map(name=>{
   const match=html.match(new RegExp("'"+name+"':\\s*\\{\\s*price:\\s*(\\d+),\\s*reqLv:\\s*(\\d+),\\s*hp:\\s*(\\d+)\\s*\\}"));

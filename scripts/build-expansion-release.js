@@ -11,7 +11,7 @@ for(const d of JSON.parse(fs.readFileSync(path.join(root,'machines/fleet-client-
 // assets are staged. Bundle that exact public dependency, never relabel it.
 const wikiBuild=JSON.parse(fs.readFileSync(path.join(root,'data/wiki.json')))?._source?.verifiedBuild;
 if(wikiBuild&&wikiBuild!==build){
- if(!/^[a-f0-9]{7,64}$/.test(wikiBuild))throw Error('Invalid Wiki source build');
+ if(!require('../src/knowledge/build-id').hashBuild(wikiBuild))throw Error('Invalid Wiki source build');
  for(const name of ['asteria-online-visual-polish.html','asteria-world-system.js','asteria-net.js']){
   const file='cache/'+wikiBuild+'/asteria-online.io/'+name;
   if(!fs.existsSync(path.join(root,file)))throw Error('Verified Wiki source dependency missing: '+name);
@@ -27,7 +27,7 @@ for(const name of fs.readdirSync(path.join(root,'scripts')).filter(name=>/^test-
  for(const match of text.matchAll(/['"]([a-f0-9]{7,64})['"]|cache\/([a-f0-9]{7,64})\//g))fixtureBuilds.add(match[1]||match[2]);
 }
 for(const entry of fs.readdirSync(path.join(root,'cache'),{withFileTypes:true})){
- if(!entry.isDirectory()||!/^[a-f0-9]{7,64}$/.test(entry.name)||!fixtureBuilds.has(entry.name))continue;
+ if(!entry.isDirectory()||!require('../src/knowledge/build-id').hashBuild(entry.name)||!fixtureBuilds.has(entry.name))continue;
  const fixtures=fixtureNames.map(name=>'cache/'+entry.name+'/asteria-online.io/'+name);
  if(!fixtures.every(file=>fs.existsSync(path.join(root,file))))continue;
  for(const file of fixtures)if(!list.includes(file))list.push(file);
