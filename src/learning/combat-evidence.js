@@ -15,7 +15,7 @@ function scope(i,now=Date.now()){
  const roster=party?.id?(party.members||[]).map(m=>[m.id,m.job,m.lv]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))):[];
  const seen=i.combatEncounter,observed=seen&&seen.actorId===i.actorIdentity.actorId&&seen.session===i.actorOwner.session&&seen.generation===i.socialInbox.generation&&seen.room===p.room&&fresh(seen.at,30000,now);
  const target=observed?seen.target:i.goal?.monsterId||null;if(!target)return null;
- return {telemetryVersion:3,combatDomain:require('../observability/combat-domain').classify(p.room),actorId:i.actorIdentity.actorId,build,sourceSignature:i.v2.loadedSourceIdentity?.signature||null,session:i.actorOwner.session,generation:i.socialInbox.generation,job:s.job,level:s.lv,role:role(s.job,i.catalog().world),map:p.room,target,party:digest([party?.id||null,roster]),hasParty:!!party?.id,loadoutSignature:loadout(s),equip:{...s.equip},petActive:s.petActive||null};
+ return {telemetryVersion:4,combatDomain:require('../observability/combat-domain').classify(p.room),actorId:i.actorIdentity.actorId,build,sourceSignature:i.v2.loadedSourceIdentity?.signature||null,session:i.actorOwner.session,generation:i.socialInbox.generation,job:s.job,level:s.lv,role:role(s.job,i.catalog().world),map:p.room,target,party:digest([party?.id||null,roster]),hasParty:!!party?.id,loadoutSignature:loadout(s),equip:{...s.equip},petActive:s.petActive||null};
 }
 function metrics(r){
  const sec=r.observedMs/1000,enough=require('./combat-windows').microReady(r),scaled=require('../observability/combat-domain').classify(r.map)==='scaled_instance';
@@ -47,7 +47,15 @@ class CombatEvidence{
   }
   const room=i.livePos?.room,native=this.nativeRooms.get(room),own=m.t==='hres'&&Array.isArray(m.l)?m.l.find(x=>Array.isArray(x)&&x[1]>0&&native?.has(x[0])):null;
   const incoming=m.t==='phit'&&m.d>0&&native?.has(m.n)&&(!i.combatEncounter||i.combatEncounter.source!=='own_hit'||!fresh(i.combatEncounter.at,30000,now));
-  if(own||incoming)i.combatEncounter={actorId:i.actorIdentity?.actorId,session:i.actorOwner?.session,generation:i.socialInbox?.generation,room,target:native.get(own?own[0]:m.n).id,source:own?'own_hit':'received_hit',at:now};
+  if(own||incoming){
+   const prior=i.combatEncounter,target=native.get(own?own[0]:m.n).id;
+   const boundary=prior&&prior.target!==target&&prior.actorId===i.actorIdentity?.actorId&&prior.session===i.actorOwner?.session&&prior.generation===i.socialInbox?.generation&&prior.room===room&&fresh(prior.at,30000,now);
+   // Close exposure at the native species boundary, then initialize its next
+   // segment. Periodic observations share this clock, so intervals never double.
+   if(boundary)this.observe(i,now);
+   i.combatEncounter={actorId:i.actorIdentity?.actorId,session:i.actorOwner?.session,generation:i.socialInbox?.generation,room,target,source:own?'own_hit':'received_hit',at:now};
+   if(boundary)this.observe(i,now);
+  }
   const r=this.row(i,now);if(!r)return;
   for(const [n,t]of native||[]){const old=this.monsters.get(n);if(!old||old.row!==r.id||old.id!==t.id)this.monsters.set(n,{...t,row:r.id});}
   if(own||incoming)r.targetAuthority='native_spawn_hit';r.plannedTarget=i.goal?.monsterId||null;

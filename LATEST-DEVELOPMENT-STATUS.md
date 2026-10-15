@@ -1,3 +1,11 @@
+## Version4 full offline verification — 2026-10-15T12:26:44.177890+07:00 Asia/Bangkok
+
+Native-boundary timing candidate passed152/152 suites on Windows and152/152 in the isolated Linux sandbox, without source/build drift. Protected boundary safety PASS; sanitized public fixtures13/13 PASS. Actual native deployment and performance outcomes remain separate from these offline results. Source changes preserve no-replay, ownership and human stop.
+
+## Native species-boundary exposure — 2026-10-15T12:21:08.829122+07:00 Asia/Bangkok
+
+Combat evidence now closes and opens exposure segments at authenticated native monster-species changes, sharing the periodic observation clock. A regression with2s species alternation and7s periodic observations preserves exactly320s total active exposure in two separate target aggregates, without double counting or including a20s unobserved gap. TelemetryVersion4 isolates these changed measurement semantics. Changed combat-evidence.js and test-telemetry-recovery.js. Explicit sanitized public offline checks13/13 PASS; full source Windows/Linux checks in progress. Transaction no-replay, ownership, human-stop and paid five-minute comparison gates unchanged. Native performance improvement is not claimed.
+
 ## Native-target release verification — 2026-10-15T12:11:06.031094+07:00 Asia/Bangkok
 
 Final source passed all152 offline suites on Windows and all152 in the isolated Linux sandbox, with no source/build drift. Protected boundary safety PASS; explicit sanitized public fixtures13/13 PASS. Native encounter attribution and routing-independent combat loadout regression are included. Live acceptance is tracked separately; offline results do not prove measured combat improvement. No runtime data, credentials, game source artifacts or private actor identities are published.
