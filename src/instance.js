@@ -1329,7 +1329,7 @@ towerQuit() { return this.socialSend('twquit'); }
     });
     let guildKeep = [];
     await step('equipment',async()=>{await this.recoverStoredUpgrades();const upgrades=await this.planBag(this.roster);if(upgrades.equip.length){const result=await this.equipItems(upgrades.equip);this.log('equipment upgrade: '+JSON.stringify(result));}});
-    this.investmentPlan=require('./investment-plan').choose(this.lastSave||{},this.catalog(),economy.loadWiki(this.root),{campaignComplete:require('./planning/capped-campaign').plan(this).phase==='complete',reserved:require('./runtime/paid-actions').heldResources(this),...require('./runtime/craft-scope').investmentOptions(this)});
+    this.investmentPlan=require('./investment-plan').choose(this.lastSave||{},this.catalog(),economy.loadWiki(this.root),{campaignComplete:require('./planning/capped-campaign').plan(this).phase==='complete',reserved:require('./runtime/paid-actions').heldResources(this),...require('./runtime/craft-scope').investmentOptions(this),...require('./runtime/refinement-gates').investmentOptions(this)});
     const investment=this.investmentPlan.selected;
     this.onBrainReport?.('ลงทุนอุปกรณ์: '+(investment?investment.kind+' '+investment.name+' · ':'')+this.investmentPlan.reason);
     await step('craft', async () => {
@@ -1347,9 +1347,10 @@ towerQuit() { return this.socialSend('twquit'); }
       if(investment?.kind!=='refine')return null;
       const upgrades = await this.planBag(this.roster);
       if(upgrades.equip.length) await this.equipItems(upgrades.equip);
-      const current=require('./investment-plan').choose(this.lastSave||{},this.catalog(),economy.loadWiki(this.root),{campaignComplete:require('./planning/capped-campaign').plan(this).phase==='complete',reserved:require('./runtime/paid-actions').heldResources(this),...require('./runtime/craft-scope').investmentOptions(this)}).selected;
+      const current=require('./investment-plan').choose(this.lastSave||{},this.catalog(),economy.loadWiki(this.root),{campaignComplete:require('./planning/capped-campaign').plan(this).phase==='complete',reserved:require('./runtime/paid-actions').heldResources(this),...require('./runtime/craft-scope').investmentOptions(this),...require('./runtime/refinement-gates').investmentOptions(this)}).selected;
       if(current?.kind!=='refine'||current.id!==investment.id)return null;
       const r = await this.refineEquipped({targetId:current.id,maxAttempts:1,extraReserveCoins:current.extraReserveCoins,reservedMaterials:current.reservedMaterials});
+      this.equipmentMaintenanceStatus={at:Date.now(),kind:'refine',id:current.id,name:current.name,status:r.refined?'awaiting_outcome':'not_sent',reason:r.reason|| (r.refined?'native refine dispatched; awaiting receipt':'native refine did not dispatch'),missing:r.missing||[]};
       return r.refined ? `refine attempted ${r.refined} time(s)` : null;
     });
     if(investment?.kind==='enchant')await step('enchant', async () => this.enchantWeapon());

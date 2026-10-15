@@ -119,6 +119,10 @@ fs.writeFileSync(path.join(root,'logs/ai-auto.json'),JSON.stringify({history:[]}
  assert.equal(full.members[0].legendaryCount,6);assert.equal(full.members[0].confirmedReceiptCount,1,'receipts use the real ledger array and exact current actor/build');
  assert.equal(full.members[1].confirmedReceiptCount,0,'another actor receipt cannot raise feedback');
  assert.deepEqual(projected.members[0].executionGates.craft,gate);assert.equal(projected.members[0].vitals.hpRatio,1);
+ const blockedRefine={kind:'refine',status:'blocked',target:'w',reason:'unknown refinement step or journal outcome; no replay',historicalRows:29,missing:[{name:'Ore',need:3,available:1,reserved:23}]};
+ const withBlock=choiceContext({...full,members:full.members.map(m=>({...m,executionGates:{...m.executionGates,refine:blockedRefine}}))});
+ assert.equal(withBlock.members[0].executionGates.refine.reason,blockedRefine.reason);assert.equal(withBlock.members[0].executionGates.refine.historicalRows,29);assert.equal(withBlock.members[0].executionGates.refine.missing[0].reserved,23);
+ assert(Buffer.byteLength(JSON.stringify(primaryBody(full,withBlock,'meta','test')))<24576);
  assert.equal(projected.members[0].personalBrain.reserve,12000);
  assert(Buffer.byteLength(projected.members[0].personalBrain.milestones.reason)<=240);
  assert(!JSON.stringify(projected).includes('not-for-model'));

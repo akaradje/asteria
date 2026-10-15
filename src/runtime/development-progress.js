@@ -71,7 +71,9 @@ function refineOpportunity(i,now=Date.now()){
  // A costly low-odds weapon roll must not starve a cheaper guaranteed step.
  // These are role-weighted estimates; only a fresh native save proves success.
  rows.sort((a,b)=>(b.valuePerCopper??-1)-(a.valuePerCopper??-1)||a.oreNeed-b.oreNeed||a.from-b.from||a.coinCost-b.coinCost);
- const next=rows.find(r=>!require('./refine-scope').blocks(i,r.id,now)&&require('./paid-actions').preflight(i,'refineEquipped',[{targetId:r.id,guaranteedOnly:r.guaranteed,extraReserveCoins,reservedMaterials,...(r.foundation?{foundation:true}:{})}]).allowed);return next?{...next,early,strictGoal,reserve,extraReserveCoins,reservedMaterials,prepareBoss,classPreparation,wingPreparation,campaignPhase:campaign?.phase||'training'}:null;
+ const gates=rows.map(r=>require('./refinement-gates').check(i,r.id,{guaranteedOnly:r.guaranteed,extraReserveCoins,reservedMaterials,...(r.foundation?{foundation:true}:{})}));
+ i.refinementGates={at:now,eligible:gates.filter(g=>g.allowed).length,blocked:gates.filter(g=>!g.allowed).slice(0,8)};
+ const next=rows.find((r,n)=>gates[n].allowed);return next?{...next,early,strictGoal,reserve,extraReserveCoins,reservedMaterials,prepareBoss,classPreparation,wingPreparation,campaignPhase:campaign?.phase||'training'}:null;
 }
 async function tick(i,screen,{townOnly=false}={}){
  if(townOnly&&i.livePos?.room!=='town')return null;

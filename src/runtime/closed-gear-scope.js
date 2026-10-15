@@ -31,7 +31,11 @@ function independent(i,row,targetId,action,now=Date.now()){
  // An unknown roll on this very item is still forbidden, across all builds.
  if(row.kind!=='refine'||!ids.includes(targetId))return true;
  const before=previousRefine(i,row,targetId),current=s.refine[targetId]??0;
- return before!==null&&(current!==before||current===before&&require('./fresh-refine-attempt').allowed(i,targetId,now));
+ // A truncated non-legacy ledger cannot supply an old before-level. Keep its
+ // journal untouched; explicit fresh-intent policy permits a separately funded
+ // UUID, with immutable archival enforced before ledger.begin and dispatch.
+ if(before===null)return !row.legacyIdentityUnknown&&/^development:[a-f0-9-]{36}$/.test(row.id||'')&&require('./fresh-refine-attempt').allowed(i,targetId,now);
+ return current!==before||require('./fresh-refine-attempt').allowed(i,targetId,now);
 }
 function domainClosed(i,row,now=Date.now()){
  if(history(i,row,now))return true;

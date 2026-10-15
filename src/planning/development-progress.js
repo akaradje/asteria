@@ -8,7 +8,9 @@ function view(i,now=Date.now()){
  const confirmed=recent.filter(r=>r.status==='server_confirmed'&&r.evidence==='server_accepted_exact_save_revision'&&r.serverReceipt?.actorId===i.actorIdentity?.actorId&&r.context?.actorId===i.actorIdentity?.actorId&&i.actorIdentity?.actorId).map(summary);
  const pending=recent.find(r=>r.status==='pending'||r.status==='unresolved'&&r.kind==='craft');
  const fence=kind=>{const r=kind==='craft'?require('../runtime/craft-scope').blocking(i,craft?.id):i.developmentLedger?.blocking(kind);return r?{kind:r.kind,status:r.status,target:r.target?.id||null,evidence:r.evidence||null,transactionId:r.id,at:r.at}:null;};
- const executionGates={craft:fence('craft'),refine:fence('refine'),unknownReplayAllowed:false};
+ const targetIds=[...new Set([i.investmentPlan?.selected?.kind==='refine'?i.investmentPlan.selected.id:null,...(i.investmentPlan?.blocked||[]).map(r=>r.target),...(i.refinementGates?.blocked||[]).map(r=>r.target)].filter(Boolean))].slice(0,8);
+ const targetGates=targetIds.map(id=>require('../runtime/refinement-gates').check(i,id));
+ const executionGates={craft:fence('craft'),refine:fence('refine')||targetGates.find(g=>!g.allowed)||null,refineTargets:targetGates,unknownReplayAllowed:false};
  const stale=!Number.isFinite(i.lastSaveAt)||now-i.lastSaveAt<0||now-i.lastSaveAt>30000;
  const campaign=i.endgameCampaign?.phase?i.endgameCampaign:require('./capped-campaign').plan(i);
  const equipmentWork=require('./campaign-equipment').profile(i)?.craftPortfolio||null;

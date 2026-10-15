@@ -1,3 +1,9 @@
+## Closed refinement history and execution diagnostics — 2026-10-15T13:51:19.847824+07:00 Asia/Bangkok
+
+A missing historical refinement ledger baseline no longer permanently blocks an explicitly authorized, independently budgeted new UUID after fresh authenticated native ownership/session/generation readback. Original journal records remain unchanged; append-only SHA256 archives are persisted and flushed before preparing the new intent and verified again before native dispatch. Original UUIDs and current ambiguous outcomes cannot be resent. Corrupt archives and active work fail closed. No historical success or cost is invented.
+
+Target-specific paid preflight blockers now reach investment selection, runtime progression, maintenance status and bounded AI context. Resource reserves, native destructive-risk checks and protected transaction/ownership kernels remain binding. Added negative cases and actual native-wrapper single-dispatch tests. Public fixture checks16/16 PASS; operational Windows152/152 and protected-source safety PASS; isolated Linux152/152, syntax and staged private-value/secret scans PASS; publication does not prove a live native upgrade. No private accounts, addresses, operational transactions, journals, learning or game assets included.
+
 ## Version4 full offline verification — 2026-10-15T12:26:44.177890+07:00 Asia/Bangkok
 
 Native-boundary timing candidate passed152/152 suites on Windows and152/152 in the isolated Linux sandbox, without source/build drift. Protected boundary safety PASS; sanitized public fixtures13/13 PASS. Actual native deployment and performance outcomes remain separate from these offline results. Source changes preserve no-replay, ownership and human stop.

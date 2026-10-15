@@ -16,11 +16,12 @@ function evidence(i,id,now=Date.now()){
  const old=(i.developmentLedger?.rows||[]).filter(r=>r.kind==='refine'&&r.target?.id===id&&r.reconciliation?.replayBlocked===true&&r.reconciliation.historicalSuccessKnown===false&&require('./native-reservation-result').result(r,i.actorIdentity.actorId)==='RECONCILED');
  const legacy=(i.v2?.journal?.rows||[]).filter(r=>r.kind==='refine'&&r.target?.id===id&&require('./closed-gear-scope').history(i,r,now));
  if(!old.length&&!legacy.length)return null;
- return {version:1,kind:'new_budgeted_refine_intent',at:now,targetId:id,from:i.serverSaveReceipt.state.refine[id]??0,proof:{...i.serverSaveReceipt.proof},nativeBudget:{coins:i.serverSaveReceipt.state.coins,materials:{...i.serverSaveReceipt.state.materials}},originalTransactionIds:[...old.map(r=>r.id),...legacy.flatMap(r=>[r.id,r.id.replace(/^development:/,'')])],historicalSuccessKnown:false,historicalCostKnown:false,replayed:false};
+ const historyArchives=require('./refine-history-archive').preserve(i,legacy);
+ return {version:2,kind:'new_budgeted_refine_intent',at:now,targetId:id,from:i.serverSaveReceipt.state.refine[id]??0,proof:{...i.serverSaveReceipt.proof},nativeBudget:{coins:i.serverSaveReceipt.state.coins,materials:{...i.serverSaveReceipt.state.materials}},originalTransactionIds:[...old.map(r=>r.id),...legacy.flatMap(r=>[r.id,r.id.replace(/^development:/,'')])],historyTransactionIds:legacy.map(r=>r.id),historyArchives,historicalSuccessKnown:false,historicalCostKnown:false,replayed:false};
 }
 function dispatch(i,row,step,now=Date.now(),continuation=false){
  const e=row?.freshNativeIntent;
  if(!e)return true;
- return e.kind==='new_budgeted_refine_intent'&&row.id!==undefined&&!e.originalTransactionIds.includes(row.id)&&e.targetId===step.id&&e.from===step.from&&row.context?.actorId===e.proof.actorId&&row.context?.build===e.proof.build&&row.context?.sessionStartedAt===e.proof.sessionStartedAt&&row.context?.generation===e.proof.generation&&allowed(i,step.id,now,continuation?row:null);
+ return e.version===2&&e.kind==='new_budgeted_refine_intent'&&Array.isArray(e.originalTransactionIds)&&row.id!==undefined&&!e.originalTransactionIds.includes(row.id)&&e.targetId===step.id&&e.from===step.from&&require('./refine-history-archive').verified(i,e)&&row.context?.actorId===e.proof.actorId&&row.context?.build===e.proof.build&&row.context?.sessionStartedAt===e.proof.sessionStartedAt&&row.context?.generation===e.proof.generation&&allowed(i,step.id,now,continuation?row:null);
 }
 module.exports={enabled,allowed,evidence,dispatch};
