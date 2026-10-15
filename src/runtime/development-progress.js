@@ -151,7 +151,7 @@ async function tick(i,screen,{townOnly=false}={}){
  try{
   const result=await i.refineEquipped({targetId:current.id,maxAttempts:1,guaranteedOnly:current.guaranteed,extraReserveCoins:current.extraReserveCoins,reservedMaterials:current.reservedMaterials,...(current.foundation?{foundation:true}:{})});
   const observed=i.lastSaveAt>at&&(i.lastSave.refine?.[current.id]||0)>current.from;
-  i.equipmentMaintenanceStatus={...i.equipmentMaintenanceStatus,at:Date.now(),status:observed?'change_observed':result?.refined?'awaiting_outcome':'not_sent',evidence:observed?'outgoing_client_save':'no_confirmed_increase',result:{attempted:result?.refined||0,reason:result?.reason||result?.open?.reason||null}};
+  i.equipmentMaintenanceStatus=require('./equipment-outcome').bind(i,{...i.equipmentMaintenanceStatus,at:Date.now(),status:observed?'change_observed':result?.refined?'awaiting_outcome':'not_sent',evidence:observed?'outgoing_client_save':'no_confirmed_increase',result:{attempted:result?.refined||0,reason:result?.reason||result?.open?.reason||null}},at);
   return 'equipment readiness: '+current.name+' '+i.equipmentMaintenanceStatus.status;
  }finally{await i.closeGamePanel();}
 }

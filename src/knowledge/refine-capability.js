@@ -27,9 +27,10 @@ function step(save,cat,id,{materials=save.materials||{},consumables=save.consuma
  if(typeof oreName!=='string'||![oreNeed,coinCost,starNeed].every(n=>Number.isSafeInteger(n)&&n>=0))return null;
  const guardName=cat.world.STONES?.guard?.name,guard=high&&typeof guardName==='string'&&(consumables[guardName]||0)>0;
  const spare=(save.bag||[]).filter(x=>(typeof x==='string'?x:x?.id)===id).length>0&&!save.locks?.includes(id);
- const chance=r.chance[from]/100;
- const cost={Copper:coinCost,[oreName]:oreNeed,...(starNeed?{[r.star]:starNeed}:{}),...(guard?{[guardName]:1}:{})};
+ const blessingDecision=require('../planning/refine-blessing').evaluate(save,cat.world,from,consumables),blessing=blessingDecision.use;
+ const chance=blessingDecision.boostedChancePct/100;
+ const cost={Copper:coinCost,[oreName]:oreNeed,...(starNeed?{[r.star]:starNeed}:{}),...(guard?{[guardName]:1}:{}),...(blessing?{[blessingDecision.name]:1}:{})};
  const ready=coins>=coinCost&&(materials[oreName]||0)>=oreNeed&&(!starNeed||(materials[r.star]||0)>=starNeed);
- return {slot,id,from,to:from+1,max:cap.max,coinCost,oreName,oreNeed,starName:starNeed?r.star:null,starNeed,guard,guardName:guard?guardName:null,destructive:high&&!guard,spare,breakChance:high&&!guard?1-chance:0,chancePct:chance*100,guaranteed:chance===1,cost,ready,riskVerified:true};
+ return {slot,id,from,to:from+1,max:cap.max,coinCost,oreName,oreNeed,starName:starNeed?r.star:null,starNeed,guard,guardName:guard?guardName:null,blessing,blessingName:blessing?blessingDecision.name:null,blessingDecision,destructive:high&&!guard,spare,breakChance:high&&!guard?1-chance:0,chancePct:chance*100,guaranteed:chance===1,cost,ready,riskVerified:true};
 }
 module.exports={support,nativeRules,step};

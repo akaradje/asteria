@@ -554,7 +554,7 @@ function refinePlan({ equip, refine = {}, materials = {}, coins = 0, items, wiki
     const value=goal.dynamicProgression?require('./planning/combat-roi').refinement({...state,equip,refine},{items,world},nativeStep):null;
     steps.push({
       ...nativeStep,...(value?{valuation:value,expectedGain:value.expectedGain,riskEligible:value.eligible}:{}),slot, id, name: it.name, tier, from: lv, to: lv + 1, ...(bridgeFoundation?{foundation:true}:{}),
-      chancePct: pct, guaranteed: pct >= 100,
+      chancePct: nativeStep.chancePct, guaranteed: nativeStep.guaranteed,
       coinCost, oreName, oreNeed, oreHave,
       can: nativeStep.ready&&(!value||value.eligible),
       // One bounded attempt is journaled by the runtime; low odds do not change the goal.

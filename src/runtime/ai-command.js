@@ -1,7 +1,7 @@
 'use strict';
 const {FOCUSES}=require('../character-brain');
 const actionable=a=>['review_route','recover'].includes(a)||Object.hasOwn(FOCUSES,a);
-function ownerBusy(instance){return /^(tw|dx|gd|pv)/.test(instance.livePos?.room||instance.lastSave?.mapId||'')||!!(instance.dailyTeamPending||instance.dailyWorkStatus?.ownsNavigation||instance.v2?.trial?.active()||instance.teamTradeStatus?.phase&&!['IDLE','CONFIRMED','CANCELLED'].includes(instance.teamTradeStatus.phase)||instance.choresBusy||instance.teamControl||instance.recycling||instance.pendingTravel);}
+function ownerBusy(instance){return /^(tw|dx|gd|pv)/.test(instance.livePos?.room||instance.lastSave?.mapId||'')||!!(instance.dailyTeamPending||instance.dailyWorkStatus?.ownsNavigation||instance.v2?.trial?.active()||require('./team-trade').blocksNavigation(instance)||instance.choresBusy||instance.teamControl||instance.recycling||instance.pendingTravel);}
 function eligible(command,instance,now=Date.now(),{queueOnly=false}={}) {
   const defer=queueOnly&&Object.hasOwn(FOCUSES,command?.action);
   if(!command||!actionable(command.action)||typeof command.id!=='string'||!Number.isFinite(command.expiresAt)||command.expiresAt<now)return 'คำสั่งหมดอายุหรือไม่รองรับ';
@@ -24,6 +24,6 @@ function eligible(command,instance,now=Date.now(),{queueOnly=false}={}) {
   if(!Object.hasOwn(FOCUSES,command.action)&&quiet<120000)return 'ยังมีความคืบหน้า ไม่แทรกแซง';
   return null;
 }
-function expire(instance,now=Date.now()){const c=instance.aiPending;if(c&&Number.isFinite(c.expiresAt)&&c.expiresAt<now){instance.aiPending=null;instance.aiControl={id:c.id,action:c.action,at:now,state:'rejected',status:'แผนหมดอายุระหว่างรอเจ้าของงาน ต้องวางแผนจากข้อมูลใหม่',evidence:'expired_intent_not_executed'};return true;}return false;}
+function expire(instance,now=Date.now()){const c=instance.aiPending;if(c&&Number.isFinite(c.expiresAt)&&c.expiresAt<now){instance.aiPending=null;instance.aiControl={id:c.id,actorId:c.actorId,build:c.build,action:c.action,at:now,expiresAt:c.expiresAt,state:'rejected',status:'แผนหมดอายุระหว่างรอเจ้าของงาน ต้องวางแผนจากข้อมูลใหม่',evidence:'expired_intent_not_executed',replanRequired:true};return true;}return false;}
 function accept(command,instance,now=Date.now()){return eligible(command,instance,now,{queueOnly:true});}
 module.exports={eligible,accept,ownerBusy,expire,actionable};

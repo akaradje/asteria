@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('fs'),path=require('path');
 const {FOCUSES}=require('./character-brain');
-const {context,problemSlots,strategicSlots,REVIEW_MS}=require('./ai-advisor');
+const {context,problemSlots,strategicSlots,REVIEW_MS,terminalReview}=require('./ai-advisor');
 const {eligible,actionable:nativeActionable}=require('./runtime/ai-command');
 const actionable=a=>a==='sync_game'||nativeActionable(a);
 class AutoBrain {
@@ -11,6 +11,12 @@ class AutoBrain {
   setEnabled(enabled){this.data.enabled=enabled;this.data.nextAt=enabled?Date.now():this.data.nextAt;this.save();}
   evaluate(state,farm,now){
     for(const past of this.data.history){
+      // Keep terminal/application acknowledgements before a later command replaces
+      // aiControl. Waiting three minutes must not lose an expiry seen at minute two.
+      if(past.farmId===farm.id)for(const d of past.decisions||[]){
+        const before=past.baseline?.find(m=>m.slot===d.slot),after=state.members.find(m=>m.slot===d.slot),r=after?.lastAIAction,id=d.commandId||past.at+':'+d.slot;
+        if(before?.actorId&&after?.actorId===before.actorId&&after.build===before.build&&r?.id===id&&r.actorId===before.actorId&&r.build===before.build&&['applied','rejected','failed'].includes(r.state)&&Number.isFinite(r.at)&&r.at<=now&&after.status==='playing'&&after.saveAgeSeconds>=0&&after.saveAgeSeconds<=30){past.executionReceipts||={};past.executionReceipts[d.slot]={id:r.id,actorId:r.actorId,build:r.build,state:r.state,at:r.at,status:r.status,evidence:r.evidence};}
+      }
       const at=Date.parse(past.at);if(!Number.isFinite(at)||now-at<180000||now-at>1800000)continue;
       // Older one-shot records remain historical. New records observe each
       // actor separately at 3, 10 and 15 minutes; stale frames do not consume
@@ -21,7 +27,7 @@ class AutoBrain {
         const before=past.baseline?.find(m=>m.slot===d.slot),after=state.members.find(m=>m.slot===d.slot);
         const checkpoint=[900000,600000,180000].find(ms=>now-at>=ms),previous=past.outcomeChecks[d.slot];
         if(previous?.checkpoint>=checkpoint)return past.outcomes?.find(o=>o.slot===d.slot)||{slot:d.slot};
-        const receipt=after?.lastAIAction,commandId=d.commandId||past.at+':'+d.slot;
+        const commandId=d.commandId||past.at+':'+d.slot,receipt=after?.lastAIAction?.id===commandId?after.lastAIAction:past.executionReceipts?.[d.slot];
         const row={slot:d.slot,actorId:before?.actorId||null,elapsedMs:now-at,evidence:'observed_after_advice_not_proof_of_causation',execution:receipt?.id===commandId?{state:receipt.state||'unknown',at:receipt.at,status:receipt.status,evidence:receipt.evidence}: {state:'not_confirmed'}};
         if(past.farmId!==farm.id||!before||!after||(before.actorId||null)!==(after.actorId||null)||!before.build||before.build!==after.build||after.status!=='playing'||after.saveAgeSeconds<0||!Number.isFinite(after.saveAgeSeconds)||after.saveAgeSeconds>30)return {...row,status:'ยังประเมินไม่ได้: ตัวละคร รอบเกม รุ่นเกม หรือข้อมูลสดไม่ตรง'};
         let netExp=null;try{const curve=after.level===before.level?null:require('./economy').loadCatalog(this.root,after.build).world?.expToNext;netExp=require('./observability/level-progress').delta({lv:before.level,exp:before.exp},{lv:after.level,exp:after.exp},curve);}catch{}
@@ -30,7 +36,7 @@ class AutoBrain {
         if((before.goalMap||null)!==(after.currentGoal?.mapId||null))confounders.push('goal_changed');
         if(before.busy||after.busy)confounders.push('protected_work');
         const application=row.execution.state==='applied'&&Number.isFinite(row.execution.at)&&row.execution.at>=at&&row.execution.at<=now;
-        const result={...row,...outcome,at:now,build:after.build,job:after.job,checkpoint,combatComparable:before.job===after.job,intelligence:after.intelligence||null,confounders,appliedForMs:application?now-row.execution.at:null,planAssessment:d.chain==='rejected'?'rejected_not_executed':d.commandId&&!application?'awaiting_application':outcome.effects.length?'observed_progress':'no_upgrade_observed_not_failure',levelsGained:after.level-before.level,netExp,status:outcome.effects.length?'พบผลพัฒนา '+outcome.effects.map(e=>e.kind).join(', '):netExp===null?'ยังคำนวณ EXP ไม่ได้':netExp>0?'พบ EXP เพิ่มหลังคำแนะนำ':'ยังไม่พบ EXP เพิ่มหลังคำแนะนำ'};
+        const result={...row,...outcome,at:now,build:after.build,job:after.job,checkpoint,combatComparable:before.job===after.job,intelligence:after.intelligence||null,confounders,appliedForMs:application?now-row.execution.at:null,planAssessment:d.chain==='rejected'||['rejected','failed'].includes(row.execution.state)?'rejected_not_executed':d.commandId&&!application?'awaiting_application':outcome.effects.length?'observed_progress':'no_upgrade_observed_not_failure',levelsGained:after.level-before.level,netExp,status:outcome.effects.length?'พบผลพัฒนา '+outcome.effects.map(e=>e.kind).join(', '):netExp===null?'ยังคำนวณ EXP ไม่ได้':netExp>0?'พบ EXP เพิ่มหลังคำแนะนำ':'ยังไม่พบ EXP เพิ่มหลังคำแนะนำ'};
         past.outcomeChecks[d.slot]={checkpoint,at:now};past.evaluatedAt=now;
         if(before.actorId){this.data.outcomeMemory||=[];const key=commandId+':'+checkpoint;this.data.outcomeMemory=[{...result,key,action:d.action,farmId:farm.id},...this.data.outcomeMemory.filter(o=>o.key!==key&&Number.isFinite(o.at)&&now-o.at>=0&&now-o.at<86400000)].slice(0,192);}
         return result;
@@ -49,10 +55,11 @@ class AutoBrain {
     this.data.progressionRepairIncidents=require('./learning/progression-incidents').pending(this.root);
     this.data.repairQueue=require('./learning/repair-pipeline').queue(this.data.incidents);
     const incidents=state.members.filter(m=>m.actorId&&m.recovery?.needsDiagnosis&&m.recovery.incidentKey);
+    const newTerminal=state.members.some(m=>terminalReview(m,this.data.authorityReviews));
     const newIncident=incidents.some(m=>!(this.data.diagnoses||[]).some(d=>d.actorId===m.actorId&&d.build===m.build&&d.incidentKey===m.recovery.incidentKey));
     // Wake once for new evidence, never defeat provider backoff or user pause.
     this.evaluate(state,farm,now);
-    if(now<this.data.nextAt&&!(newIncident&&!this.data.failures&&now-(this.data.lastRequestedAt||0)>=60000)){this.save();return;}
+    if(now<this.data.nextAt&&!((newIncident||newTerminal&&this.data.providerHealth?.ok!==false)&&!this.data.failures&&now-(this.data.lastRequestedAt||0)>=60000)){this.save();return;}
     // AI owns the strategic priority even during productive play. Local work
     // continues between reviews and while an existing strategy/owner is active.
     const problem=problemSlots(state),routine=strategicSlots(state,this.data.authorityReviews,now);
@@ -64,7 +71,7 @@ class AutoBrain {
       const external=result.plannerProvider;this.data.providerHealth={at:Date.now(),provider:external,ok:!!result.providers?.[external]?.ok,failures:result.providers?.[external]?.ok?0:(this.data.providerHealth?.failures||0)+1};
       result=require('./learning/local-strategic-planner').select(result,state);
       const record={at:result.at,snapshotAt:result.snapshotAt,farmId:farm.id,authority:'strategic_controller',routineSlots:routine,efficiency:result.efficiency||null,baseline:state.members.filter(m=>slots.includes(m.slot)).map(m=>({slot:m.slot,...require('./learning/advice-outcome').metrics(m),busy:m.busy,goalMap:m.currentGoal?.mapId||null})),thoughts:result.plan?.members||[],decisions:[],outcomes:[]};
-      const reviewed=m=>{const before=state.members.find(x=>x.slot===m.slot);this.data.authorityReviews||={};this.data.authorityReviews[before.actorId+':'+before.build]={at:Date.now(),action:m.action};this.data.authorityReviews=Object.fromEntries(Object.entries(this.data.authorityReviews).sort((a,b)=>b[1].at-a[1].at).slice(0,96));};
+      const reviewed=(m,queued=false)=>{const before=state.members.find(x=>x.slot===m.slot);this.data.authorityReviews||={};this.data.authorityReviews[before.actorId+':'+before.build]={at:queued?(this.data.authorityReviews[before.actorId+':'+before.build]?.at||0):Date.now(),action:m.action,terminalId:before.lastAIAction?.id||null,...(queued?{queuedUntil:Date.parse(result.snapshotAt)+120000,queuedId:result.at+':'+m.slot}:{})};this.data.authorityReviews=Object.fromEntries(Object.entries(this.data.authorityReviews).sort((a,b)=>b[1].at-a[1].at).slice(0,96));};
       const planner=result.plannerProvider||'openrouter';
       for(const m of incidents.filter(m=>slots.includes(m.slot))){
         const diagnosis={at:now,actorId:m.actorId,build:m.build,incidentKey:m.recovery.incidentKey,
@@ -89,7 +96,7 @@ class AutoBrain {
           let stillBlocked=false;try{const freshState=context(this.root),before=state.members.find(x=>x.slot===m.slot),after=freshState.members.find(x=>x.slot===m.slot),focus=Object.hasOwn(FOCUSES,m.action);stillBlocked=after?.actorId===before.actorId&&after.build===before.build&&(problemSlots(freshState).includes(m.slot)||focus&&routine.includes(m.slot)&&strategicSlots(freshState,this.data.authorityReviews).includes(m.slot))&&(!result.fallback||(planner==='local'?require('./learning/local-strategic-planner').route(result,m,freshState):require('./learning/ai-recovery-fallback').route(result,m,freshState)).allowed)&&(!(focus||route.route==='bounded_planner')||require('./learning/autonomous-policy').allowed(m.action,after,m.proposal,Date.now()));}catch{}
           if(!stillBlocked){record.decisions.push({slot:m.slot,action:m.action,status:'ไม่แทรกแซง: ข้อมูลเปลี่ยนหรือกลับมาคืบหน้าแล้ว'});continue;}
           const command={id:result.at+':'+m.slot,actorId:m.proposal?.actorId,proposal:m.proposal,build:state.members.find(r=>r.slot===m.slot)?.build,slot:m.slot,action:m.action,reason:m.reason,expiresAt:Date.parse(result.snapshotAt)+120000};
-          const reply=await this.dispatch(command);if(reply.ok!==false&&Object.hasOwn(FOCUSES,m.action))reviewed(m);require('./learning/incident-lifecycle').dispatched(this.data,{actorId:command.actorId,build:command.build,action:command.action,commandId:command.id,result:reply,at:Date.now()});record.decisions.push({slot:m.slot,commandId:command.id,actorId:command.actorId,action:m.action,status:reply.status,route:route.route,judge:j||null,chain:reply.ok===false?'rejected':'accepted_not_confirmed',proposal:m.proposal});
+          const reply=await this.dispatch(command);if(reply.ok!==false&&Object.hasOwn(FOCUSES,m.action))reviewed(m,true);require('./learning/incident-lifecycle').dispatched(this.data,{actorId:command.actorId,build:command.build,action:command.action,commandId:command.id,result:reply,at:Date.now()});record.decisions.push({slot:m.slot,commandId:command.id,actorId:command.actorId,action:m.action,status:reply.status,route:route.route,judge:j||null,chain:reply.ok===false?'rejected':'accepted_not_confirmed',proposal:m.proposal});
         }
       }
       this.data.history.unshift(record);this.data.history=this.data.history.slice(0,12);

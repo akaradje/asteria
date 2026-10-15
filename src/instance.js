@@ -959,9 +959,9 @@ towerQuit() { return this.socialSend('twquit'); }
       const contract=current.destructive?require('./knowledge/development-source').source(this.root,this.catalog().build,this.catalog(),'refine').contract.facts:null;
       if(current.destructive&&(!current.spare||current.valuation?.eligible!==true||!contract?.twoTap||!contract.confirmation))throw Error('Native destructive risk/spare/confirmation contract changed');
       const click=()=>this.eval(`(() => {
-        const stone = document.querySelector('#pBody [data-ref-stone]');
-        if (stone?.checked) { if (stone.disabled) return false; stone.click(); }
-        if (document.querySelector('#pBody [data-ref-stone]')?.checked) return false;
+        const wantedStone=${JSON.stringify(!!current.blessing)},stone = document.querySelector('#pBody [data-ref-stone]');
+        if (!!stone?.checked!==wantedStone) { if (!stone||stone.disabled) return false; stone.click(); }
+        if (!!document.querySelector('#pBody [data-ref-stone]')?.checked!==wantedStone) return false;
         const wantedGuard=${JSON.stringify(!!current.guard)},guard=document.querySelector('#pBody [data-ref-guard]');
         if(!!guard?.checked!==wantedGuard){if(!guard||guard.disabled)return false;guard.click();}
         if(!!document.querySelector('#pBody [data-ref-guard]')?.checked!==wantedGuard)return false;
@@ -1349,8 +1349,8 @@ towerQuit() { return this.socialSend('twquit'); }
       if(upgrades.equip.length) await this.equipItems(upgrades.equip);
       const current=require('./investment-plan').choose(this.lastSave||{},this.catalog(),economy.loadWiki(this.root),{campaignComplete:require('./planning/capped-campaign').plan(this).phase==='complete',reserved:require('./runtime/paid-actions').heldResources(this),...require('./runtime/craft-scope').investmentOptions(this),...require('./runtime/refinement-gates').investmentOptions(this)}).selected;
       if(current?.kind!=='refine'||current.id!==investment.id)return null;
-      const r = await this.refineEquipped({targetId:current.id,maxAttempts:1,extraReserveCoins:current.extraReserveCoins,reservedMaterials:current.reservedMaterials});
-      this.equipmentMaintenanceStatus={at:Date.now(),kind:'refine',id:current.id,name:current.name,status:r.refined?'awaiting_outcome':'not_sent',reason:r.reason|| (r.refined?'native refine dispatched; awaiting receipt':'native refine did not dispatch'),missing:r.missing||[]};
+      const startedAt=Date.now(),r = await this.refineEquipped({targetId:current.id,maxAttempts:1,extraReserveCoins:current.extraReserveCoins,reservedMaterials:current.reservedMaterials});
+      this.equipmentMaintenanceStatus=require('./runtime/equipment-outcome').bind(this,{at:Date.now(),kind:'refine',id:current.id,name:current.name,status:r.refined?'awaiting_outcome':'not_sent',reason:r.reason|| (r.refined?'native refine dispatched; awaiting receipt':'native refine did not dispatch'),missing:r.missing||[]},startedAt);
       return r.refined ? `refine attempted ${r.refined} time(s)` : null;
     });
     if(investment?.kind==='enchant')await step('enchant', async () => this.enchantWeapon());
@@ -2108,6 +2108,9 @@ towerQuit() { return this.socialSend('twquit'); }
       return s.death?'waiting for dungeon revive':'team dungeon combat';
     }
     this.outcomes?.observe({saveAt:this.lastSaveAt,mp:this.lastSave?.mp,consumables:this.lastSave?.consumables,pos:this.livePos,peers:this.teamPeers?.().map(i=>({slot:i.slot,hp:i.vitals?.hp,at:i.vitals?.at,room:i.livePos?.room}))});
+    // Observe arrival/expired navigation before an owner can starve this branch.
+    // The helper still refuses active native trade, team and payment work.
+    require('./runtime/work-continuity').reconcileTravel(this);
     // AI commands are consumed inside this tick, never concurrently with game actions.
     if (this.aiPending && !s.panelOpen) {
       const command = this.aiPending;
@@ -2146,7 +2149,6 @@ towerQuit() { return this.socialSend('twquit'); }
     const tradeAction=await require('./runtime/team-trade').tick(this,s);if(tradeAction)return tradeAction;
 
     if(!this.v3?.controller&&await this.farmGuardTick?.(s))return 'farm watchdog: ตรวจและแก้การฟาร์มเฉพาะตัว';
-    require('./runtime/work-continuity').reconcileTravel(this);
     const townRepair=await require('./runtime/town-position-recovery').tick(this,s);if(townRepair)return townRepair;
     const priorityClass=await require('./runtime/promotion-priority').tick(this,s);if(priorityClass)return priorityClass;
     await require('./runtime/market-research').tick(this,s);
@@ -3078,11 +3080,12 @@ towerQuit() { return this.socialSend('twquit'); }
       expBoostStatus:this.expBoostStatus||null,
       bagDevelopment:this.bagDevelopment||null,
       storeTier:s.storeTier,storageUsed:Array.isArray(s.storage?.gear)?s.storage.gear.length:null,storageCapacity:this.catalog().world.storeCap?.(s.storeTier),
-      equipmentMaintenanceStatus:this.equipmentMaintenanceStatus||null,
+      equipmentMaintenanceStatus:require('./runtime/equipment-outcome').view(this),
       serverRankings:this.serverRankings?.view()||null,
       competitiveGear:this.competitiveGear||null,activePetStatus:require('./runtime/active-pet').view(this),activePetPlan:this.activePetPlan||null,pets:s.pets||{},petActive:s.petActive||null,
       endgameCampaign:this.endgameCampaign?{...this.endgameCampaign,bossFeed:require('./runtime/boss-feed').view(this)}:null,mainQuest:this.mainQuest||null,
       teamTradeStatus:this.teamTradeStatus||null,
+      tradeNavigationBlocked:require('./runtime/team-trade').blocksNavigation(this),
       development:this.developmentLedger?.view()||[],
       gearPower:this.gearPower||null,
       developmentPriority:this.developmentPriority||null,

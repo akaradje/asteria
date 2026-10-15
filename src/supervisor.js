@@ -409,7 +409,7 @@ class Supervisor {
         const c = message.command;
         const inst = Number.isInteger(c?.slot) ? this.instances[c.slot] : null;
         const reason = inst ? require('./runtime/ai-command').accept(c, inst) || (inst.aiPending?'มีคำแนะนำเดิมรอตรวจ ไม่รับคำสั่งซ้อน':null) : 'ไม่พบตัวละคร';
-        if (!reason && !inst.aiPending) inst.aiPending = c;
+        if (!reason && !inst.aiPending){inst.aiPending = c;inst.aiControl={id:c.id,actorId:c.actorId,build:c.build,action:c.action,at:Date.now(),expiresAt:c.expiresAt,state:'queued',status:'รับแผนแล้ว รอเจ้าของงานและตรวจข้อมูลสดก่อนใช้',evidence:'intent_queued_not_applied'};}
         this.teamRoom.post('สมองจอ '+c?.slot,'หัวหน้าทีม',String(c?.reason||'').slice(0,1000),'ai');
         this.teamRoom.post('หัวหน้าทีม','จอ '+c?.slot,reason || 'รับแผนและเข้าคิวตรวจข้อมูลล่าสุดก่อนทำ','decision');
         process.send({ type: 'ai-command-result', id: message.id, ok:!reason, status: reason || 'เข้าคิวตรวจซ้ำก่อนลงมือ' }, () => {});
