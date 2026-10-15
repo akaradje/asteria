@@ -4,12 +4,17 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const hash=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const read=file=>{try{return JSON.parse(fs.readFileSync(file));}catch{return null;}};
+function taskFor(build,v,sourceHashes,reason){
+ const key=hash([build,v.sourceRevision]);
+ return {build,sourceRevision:v.sourceRevision,key,legacyKeys:[hash([build,v.sourceRevision,sourceHashes||null])],reason};
+}
+function sameTask(row,task){return row.key===task.key||task.legacyKeys.includes(row.key)||(row.build===task.build&&row.sourceRevision===task.sourceRevision);}
 function need(snapshot,now=Date.now(),serverHealth){
  const at=Date.parse(snapshot?.at),v=snapshot?.gameKnowledge?.systemVersion;
- if(Number.isFinite(at)&&now-at>=0&&now-at<=45000&&v&&serverHealth?.authority==='direct_server_health'&&serverHealth.ok===true&&require('../knowledge/build-id').hashBuild(serverHealth.build)&&Number.isFinite(serverHealth.at)&&now-serverHealth.at>=0&&now-serverHealth.at<=120000&&serverHealth.build!==v.build)return {build:serverHealth.build,key:hash([serverHealth.build,v.sourceRevision]),reason:'native_server_build_changed'};
+ if(Number.isFinite(at)&&now-at>=0&&now-at<=45000&&v&&serverHealth?.authority==='direct_server_health'&&serverHealth.ok===true&&require('../knowledge/build-id').hashBuild(serverHealth.build)&&Number.isFinite(serverHealth.at)&&now-serverHealth.at>=0&&now-serverHealth.at<=120000&&serverHealth.build!==v.build)return taskFor(serverHealth.build,v,snapshot.gameKnowledge.current?.sourceHashes,'native_server_build_changed');
  if(!Number.isFinite(at)||now-at<0||now-at>45000||!v?.liveFresh||!require('../knowledge/build-id').valid(v.liveBuild))return null;
  if(v.sourceMatches!==false&&v.wikiCurrent!==false&&v.architectureCurrent!==false)return null;
- return {build:v.liveBuild,key:hash([v.liveBuild,v.sourceRevision,snapshot.gameKnowledge.current?.sourceHashes||null]),reason:v.sourceMatches===false?'loaded_game_source_mismatch':v.wikiCurrent===false?'wiki_review_required':'current_release_review_required'};
+ return taskFor(v.liveBuild,v,snapshot.gameKnowledge.current?.sourceHashes,v.sourceMatches===false?'loaded_game_source_mismatch':v.wikiCurrent===false?'wiki_review_required':'current_release_review_required');
 }
 class SystemRecovery{
  constructor(root,machine,{launch,now=Date.now}={}){this.root=root;this.machine=machine;this.now=now;this.launch=launch;this.busy=false;this.file=path.join(root,'logs/ai-system/controller.json');this.state=read(this.file)||{attempts:[],history:[]};}
@@ -20,20 +25,22 @@ class SystemRecovery{
   const now=this.now();if(!enabled||!farm?.ready){return {...this.view(),mode:'inactive'};}
   const snapshot=read(path.join(this.root,'logs/status.json')),task=need(snapshot,now,this.state.serverHealth);if(!task){
    const v=snapshot?.gameKnowledge?.systemVersion,at=Date.parse(snapshot?.at);
-   if(!this.busy&&now-at>=0&&now-at<=45000&&v?.liveFresh&&v.sourceMatches===true&&v.wikiCurrent===true&&v.architectureCurrent===true&&v.build===v.liveBuild){this.state.mode='verified_current';this.state.verifiedAt=now;this.state.loadedBuild=v.build;this.state.reason='fresh native loaded source, Wiki and reviewed app manifest agree; combat benefit not inferred';if(this.state.command){this.state.command.state='verified';this.state.command.evidence='fresh_native_source_alignment';}this.save();}
+   if(!this.busy&&now-at>=0&&now-at<=45000&&v?.liveFresh&&v.sourceMatches===true&&v.wikiCurrent===true&&v.architectureCurrent===true&&v.build===v.liveBuild){if(this.state.need)this.state.lastNeed=this.state.need;if(this.state.errorHash)this.state.lastErrorHash=this.state.errorHash;delete this.state.need;delete this.state.errorHash;this.state.mode='verified_current';this.state.verifiedAt=now;this.state.loadedBuild=v.build;this.state.reason='fresh native loaded source, Wiki and reviewed app manifest agree; combat benefit not inferred';if(this.state.command){this.state.command.state='verified';this.state.command.evidence='fresh_native_source_alignment';}this.save();}
    return this.view();
   }
-  this.state.need=task;const recent=(this.state.attempts||[]).filter(r=>r.key===task.key&&now-r.at>=0&&now-r.at<3600000);
-  if(this.busy||recent.some(r=>now-r.at<600000)||recent.length>=3)return this.view();
+  this.state.need=task;const recent=(this.state.attempts||[]).filter(r=>sameTask(r,task)&&now-r.at>=0&&now-r.at<3600000);
+  const completed=(this.state.history||[]).some(r=>sameTask(r,task)&&now-r.at>=0&&now-r.at<600000);
+  if(this.busy||completed||recent.some(r=>now-Math.max(r.at,r.finishedAt||r.at)<600000)||recent.length>=3)return this.view();
   // Fail closed on mixed app source; the worker cannot approve its own source.
   const approval=require('../runtime/client-refresh').applicationApproval(this.root);
   if(!approval.allowed){this.state.mode='application_review_required';this.state.reason=approval.reason;this.save();return this.view();}
   const intent=read(path.join(this.root,'logs/host-intent.json'));
   if(intent?.mode!=='running'||!Number.isSafeInteger(intent.revision))return this.view();
-  this.busy=true;this.state.mode='reviewing';this.state.attempts=[{key:task.key,at:now},...(this.state.attempts||[])].slice(0,24);this.save();
+  const attempt={key:task.key,build:task.build,sourceRevision:task.sourceRevision,at:now};
+  this.busy=true;this.state.mode='reviewing';this.state.attempts=[attempt,...(this.state.attempts||[])].slice(0,24);this.save();
   try{await this.launch({machine:this.machine,build:task.build,sourceRevision:approval.sourceRevision,intentRevision:intent.revision});this.state.mode='awaiting_native_reload';this.state.reason='semantic public contracts approved; rolling per-actor native refresh pending without farm stop';}
   catch(e){this.state.mode='review_failed';this.state.reason='review failed; running farm and uncertain records preserved';this.state.errorHash=hash(String(e.message));}
-  finally{this.busy=false;this.state.history=[{at:this.now(),mode:this.state.mode,key:task.key},...(this.state.history||[])].slice(0,32);this.save();}
+  finally{this.busy=false;attempt.finishedAt=this.now();this.state.history=[{at:attempt.finishedAt,mode:this.state.mode,key:task.key,build:task.build,sourceRevision:task.sourceRevision},...(this.state.history||[])].slice(0,32);this.save();}
   return this.view();
  }
  request(command,{enabled,farm}={}){

@@ -2,7 +2,7 @@
 // Capture server party messages before the page's UI hook is installed.
 // The narrow whitelist avoids retaining chat, credentials or combat frame floods.
 class SocialInbox{
- constructor(bossIds=[]){this.bossPositions=new(require('./boss-feed').BossPositions)(bossIds);this.astral=new(require('../observability/astral-state').AstralState)();this.power=new(require('../observability/power-state').PowerState)();this.market=new(require('../observability/market-state').MarketState)();this.buildLab=new(require('../observability/build-lab-state').BuildLabState)();this.clear();}
+ constructor(bossIds=[]){this.bossPositions=new(require('./boss-feed').BossPositions)(bossIds);this.astral=new(require('../observability/astral-state').AstralState)();this.power=new(require('../observability/power-state').PowerState)();this.market=new(require('../observability/market-state').MarketState)();this.buildLab=new(require('../observability/build-lab-state').BuildLabState)();this.forgeSupplies=new(require('../observability/forge-supplies').ForgeSupplies)();this.clear();}
  // Once bound, absence is evidence too: the new connection has not received a
  // party yet. Falling back to the page could return an old connection's frame.
  sustainTelemetry(){return {generation:this.generation,self:this.power.combat.view(),combatDomain:this.power.combatDomain,authority:'server_socket_observations_not_causal_support_credit'};}
@@ -15,16 +15,16 @@ class SocialInbox{
  }
  sent(payload,at=Date.now()){
   if(typeof payload!=='string'||payload.length>1000000)return;
-  try{const m=JSON.parse(payload);this.market.sent(m,at);this.power.combat.sent(m,at);}catch{}
+  try{const m=JSON.parse(payload);this.market.sent(m,at);this.forgeSupplies.sent(m,at);this.power.combat.sent(m,at);}catch{}
  }
- clear(){this.latest=new Map();this.rows=[];this.streamAt=null;this.criticalGap=false;this.metrics={oversize:0,batchOverflow:0,invalid:0};this.bossPositions?.clear();this.astral?.reset(this.generation||0);this.power?.reset(this.generation||0);this.market?.reset(this.generation||0);this.buildLab?.reset(this.generation||0);}
+ clear(){this.latest=new Map();this.rows=[];this.streamAt=null;this.criticalGap=false;this.metrics={oversize:0,batchOverflow:0,invalid:0};this.bossPositions?.clear();this.astral?.reset(this.generation||0);this.power?.reset(this.generation||0);this.market?.reset(this.generation||0);this.buildLab?.reset(this.generation||0);this.forgeSupplies?.reset(this.generation||0);}
  receive(payload,at=Date.now()){
   try{if(typeof payload!=='string')return;if(payload.length>1000000){this.metrics.oversize++;this.criticalGap=true;return;}const packet=JSON.parse(payload);
    if(!packet||typeof packet.t!=='string')return;this.streamAt=at;
    // New clients opt into the server's documented {t:'b',l:[...]} batching.
      if(packet?.t==='b'&&Array.isArray(packet.l)&&packet.l.length>1000){this.metrics.batchOverflow++;this.criticalGap=true;return;}
      const messages=packet?.t==='b'&&Array.isArray(packet.l)?packet.l:[packet];
-   for(const m of messages)if(m&&typeof m.t==='string'){this.bossPositions?.receive(m,at);this.power.receive(m,at);this.market.receive(m,at);this.buildLab.receive(m,at);}
+   for(const m of messages)if(m&&typeof m.t==='string'){this.bossPositions?.receive(m,at);this.power.receive(m,at);this.market.receive(m,at);this.buildLab.receive(m,at);this.forgeSupplies.receive(m,at);}
    for(const m of messages)if(this.astral.receive(m,at)){this.latest.set(m.t,{at,m:m.t==='asno'?{t:'asno',why:this.astral.rejection.reason}:{t:'as',...this.astral.state}});}
    // Keep only public spawn timing. Never retain chat, tokens or arbitrary frames.
    for(const m of messages)if(m?.t==='bossboard'&&Number.isFinite(m.now)&&Array.isArray(m.list)&&m.list.length<=100){const list=m.list.filter(b=>typeof b.id==='string'&&b.id.length<=100&&typeof b.map==='string'&&b.map.length<=100&&(typeof b.up==='boolean'||Number.isInteger(b.up)&&b.up>=0&&b.up<=1000)&&(b.next==null||Number.isFinite(b.next))).map(b=>({id:b.id,map:b.map,up:!!b.up,next:b.next??null}));this.latest.set('bossboard',{at,m:{t:'bossboard',now:m.now,list}});}

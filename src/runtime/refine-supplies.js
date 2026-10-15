@@ -17,12 +17,12 @@ function opportunity(i){
  return null;
 }
 function eligible(i){return i.status==='playing'&&i.autoChores===true&&i.livePos?.room==='town'&&!i.recycling&&!i.choresBusy&&!i.v2?.trial?.active()&&!i.teamControl&&!i.dailyTeamPending&&!i.dailyWorkStatus?.ownsNavigation&&!i.pendingTravel&&!i.survivalRecovery&&!i.activeResourceClaim&&!i.activeDevelopmentAttempt&&i.v2?.sourceCoherence?.matches===true&&!require('./team-trade').blocksNavigation(i)&&fresh.decisionGate(i).allowed&&i.registryV32?.store?.validateOwner(i.actorOwner)===true;}
-function receipt(row,after,i){
- if(i.actorIdentity?.actorId!==row.actorId)return false;
+function receipt(row,after,i,{rejected=false}={}){
+ if(i.actorIdentity?.actorId!==row.actorId||i.actorOwner?.session!==row.session||i.socialInbox?.generation!==row.generation)return false;
  const b=row.target.before,a=after?.state,p=after?.proof,c=row.target.context,s=row.target.supply;
- if(!p||p.authority!=='server_readback'||p.actorId!==row.actorId||p.sessionStartedAt!==c.sessionStartedAt||p.generation!==row.generation||p.build!==c.build||p.requestAt<row.sentAt||p.at<p.requestAt||!fresh.fresh(p.at,30000)||p.rev<=c.rev||!a||a.coins!==b.coins-s.price||(a[s.group]?.[s.name]||0)!==(b[s.group]?.[s.name]||0)+1)return false;
+ if(!p||![p.at,p.requestAt,p.rev,c.rev,row.sentAt].every(Number.isSafeInteger)||i.bagSessionStartedAt!==c.sessionStartedAt||i.catalog().build!==c.build||p.authority!=='server_readback'||p.actorId!==row.actorId||p.sessionStartedAt!==c.sessionStartedAt||p.generation!==row.generation||p.build!==c.build||p.requestAt<row.sentAt||p.at<p.requestAt||!fresh.fresh(p.at,30000)||(rejected?p.rev<c.rev:p.rev<=c.rev)||!a||a.coins!==b.coins-(rejected?0:s.price)||(a[s.group]?.[s.name]||0)!==(b[s.group]?.[s.name]||0)+(rejected?0:1))return false;
  const equal=require('./isolated-storage').equal;if(fields.some(k=>!equal(a[k],b[k])))return false;
- for(const group of ['materials','consumables'])for(const name of new Set([...Object.keys(b[group]||{}),...Object.keys(a[group]||{})]))if((a[group]?.[name]||0)!==(b[group]?.[name]||0)+(group===s.group&&name===s.name?1:0))return false;
+ for(const group of ['materials','consumables'])for(const name of new Set([...Object.keys(b[group]||{}),...Object.keys(a[group]||{})]))if((a[group]?.[name]||0)!==(b[group]?.[name]||0)+(!rejected&&group===s.group&&name===s.name?1:0))return false;
  return true;
 }
 async function tick(i){
@@ -33,16 +33,25 @@ async function tick(i){
  return i.v2.scheduler.run('native-refine-supply',async()=>{
   i.v2.scheduler.checkpoint();if(!eligible(i))return null;const open=await i.openTownService('smithShop');if(!open?.ok)return null;
   await new Promise(r=>setTimeout(r,700));await i.eval(`(()=>{const b=document.querySelector('#pBody [data-smith="refine"]');if(b)b.click();return true;})()`);
-  const baseline=await require('./isolated-storage').readback(i),p=baseline?.proof,current=opportunity(i);if(!eligible(i)||!p||!current||current.kind!==wanted.kind||p.actorId!==i.actorIdentity.actorId||p.generation!==i.socialInbox.generation||p.sessionStartedAt!==i.bagSessionStartedAt||p.build!==cat.build||!fresh.fresh(p.at,5000)||store.pending(p.actorId).length)return null;
+  const baseline=await require('./native-save-probe').authoritativeReadback(i),p=baseline?.proof,current=opportunity(i);if(!eligible(i)||!p||!current||current.kind!==wanted.kind||p.actorId!==i.actorIdentity.actorId||p.generation!==i.socialInbox.generation||p.sessionStartedAt!==i.bagSessionStartedAt||p.build!==cat.build||!fresh.fresh(p.at,5000)||store.pending(p.actorId).length)return null;
   const ready=await i.eval(`(()=>{const b=document.querySelector(${JSON.stringify(current.selector)});return !!b&&!b.disabled&&b.textContent.replace(/,/g,'').includes(${JSON.stringify(String(current.price))});})()`);if(!ready)return null;
+  const observer=i.socialInbox.forgeSupplies,mark=observer?.mark();if(!mark||mark.pending||mark.generation!==p.generation||i.socialInbox.criticalGap)return null;
   const row=store.begin({id:crypto.randomUUID(),actorId:p.actorId,session:i.actorOwner.session,generation:p.generation,kind:'refine:supply',bill:{Copper:current.price},available:require('./paid-actions').inventory(i.lastSave,cat),contractRevision:contract.sourceDigest,target:{supply:current,before:baseline.state,context:{...p}}});
   store.sent(row.id);let clicked=false;
   try{
    const click=()=>i.eval(`(()=>{const b=document.querySelector(${JSON.stringify(current.selector)});if(!b||b.disabled||!b.textContent.replace(/,/g,'').includes(${JSON.stringify(String(current.price))}))return false;b.click();return true;})()`);
-   const at=Date.now();clicked=await click();if(clicked){await new Promise(r=>setTimeout(r,window.minimumMs+50));i.v2.scheduler.checkpoint();if(eligible(i)&&Date.now()-at<window.maximumMs)await click();}
-   await new Promise(r=>setTimeout(r,900));const after=await require('./isolated-storage').readback(i);
-   const sent=store.get(row.id);if(receipt(sent,after,i)){store.receipt(row.id,{receiptId:'smith-supply:'+p.actorId+':'+after.proof.rev,actorId:p.actorId,session:row.session,generation:row.generation,kind:row.kind,authority:'server_readback',at:after.proof.at,applied:true,proof:{...after.proof,delta:{Copper:-current.price,[current.name]:1}}});i.refineSupplyStatus={at:Date.now(),id:row.id,status:'CONFIRMED',kind:current.kind,price:current.price};return 'native refinement supply verified';}
-   store.transition(row.id,'UNCERTAIN',{reason:'Native smith outcome unknown; never resend'});i.refineSupplyStatus={at:Date.now(),id:row.id,status:'UNCERTAIN',replayBlocked:true};return 'native refinement supply readback pending';
+   const at=Date.now();clicked=await click();if(clicked){await new Promise(r=>setTimeout(r,window.minimumMs+50));i.v2.scheduler.checkpoint();if(eligible(i)&&observer.generation===mark.generation&&observer.commandSequence===mark.commandSequence&&Date.now()-at<window.maximumMs)await click();}
+   const observed=await require('../observability/forge-supplies').waitOutcome(observer,mark,current);
+   const after=await require('./native-save-probe').authoritativeReadback(i),sent=store.get(row.id),rejected=observed.state==='rejected';
+   // Recheck the whole observation lease after the GET: late/conflicting frames,
+   // reconnects and foreign commands can never turn a payment into a receipt.
+   const final=observer.outcome(mark,current),event=final.event;
+   if(!i.socialInbox.criticalGap&&['confirmed','rejected'].includes(observed.state)&&final.state===observed.state&&event.at>=sent.sentAt&&event.at<=after?.proof?.at&&(!event.ok||Number.isSafeInteger(event.rev)&&event.rev>p.rev&&event.rev<=after.proof.rev)&&receipt(sent,after,i,{rejected})){
+    store.receipt(row.id,{receiptId:'smith-supply:'+p.actorId+':'+row.id+':'+event.sequence,actorId:p.actorId,session:row.session,generation:row.generation,kind:row.kind,authority:'server_readback',at:after.proof.at,applied:!rejected,proof:{...after.proof,socket:event,delta:rejected?{}:{Copper:-current.price,[current.name]:1}}});
+    i.refineSupplyStatus={at:Date.now(),id:row.id,status:rejected?'NOT_APPLIED':'CONFIRMED',kind:current.kind,price:current.price,reason:event.no,authority:'server_socket_and_readback'};return rejected?'native refinement supply rejected without charge':'native refinement supply verified';
+   }
+   i.refineSupplyStatus={at:Date.now(),id:row.id,status:'UNCERTAIN',replayBlocked:true,observation:observed.state};
+   store.transition(row.id,'UNCERTAIN',{reason:'Native smith outcome unknown; never resend',supplyObservation:{state:final.state,op:event?.op,no:event?.no,receivedAt:event?.at,deltaValid:event?.deltaValid,readbackAt:after?.proof?.at}});return 'native refinement supply readback pending';
   }catch{store.transition(row.id,'UNCERTAIN',{reason:'Native smith exception; never resend'});return null;}finally{await i.closeGamePanel();}
  },{contract:require('./action-contract').contract(i,'native-refine-supply')});
 }

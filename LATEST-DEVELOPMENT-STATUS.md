@@ -1,3 +1,7 @@
+## Bounded native supply confirmation and review queue stability — 2026-10-15T23:53:34.639790+07:00 Asia/Bangkok
+
+Observe sanitized native forge replies before GET-only wallet/item verification. Support delayed results, guard already-armed confirmation against duplicate dispatch, and close no-charge rejection only with unchanged authenticated wallet/inventory. Uncertain original UUIDs remain quarantined and never resent. Unify native-review queue identity across evidence channels, preserve legacy and completion-time cooldown after long failures, and retain resolved diagnostic history. Offline assertions and runtime outcomes are reported separately.
+
 ## Guarded six-character rollout verified — 2026-10-15T23:23:35.872265+07:00 Asia/Bangkok
 
 The repaired application is loaded on both registered remote hosts with six native actor/build/session/generation readbacks, coherent native751aed14 data and fresh saves. Host AI checks5/5 each; AI enabled on both with zero recorded failures at acceptance. Windows farm/controller/machine untouched. Full frozen Windows156/156 and isolated Linux156/156, protected safety11 unchanged, public21/21 and15 narrow private incident-admission fixtures pass.
