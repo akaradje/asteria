@@ -1,3 +1,7 @@
+## Post-rollout recovery observations — 2026-10-16T04:30:45.750065+07:00 Asia/Bangkok
+
+Final source remains7ee171c6. A final read at04:30 Bangkok confirmed all six playing/coherent, fresh identity-bound server readbacks under40 seconds, no active held/uncertain claims and the692 original SHA-256 matches. Both advisors produced further new reviews with zero failures. One actor's native page navigation briefly entered cleanup_wait before the existing supervisor recovered without duplicate login; another rejected an expired refinement intent before payment and recovered. These incidents are retained as stability limitations, not hidden by the successful earlier acceptance. A new independently budgeted final-source Blessing attempt closed server_no_increase with exact native receipt and no equipped level change. No further manual restart or code edit was performed. Short observation does not establish long-term uptime or combat improvement.
+
 ## Guarded six-actor lifecycle rollout verified — 2026-10-16T04:27:03.303755+07:00 Asia/Bangkok
 
 Source 7ee171c669f981223455806132a0024c7a5b55c652996ea0e0219f941c8ac534 / full 73b99f6ad09e338e21b8c8f524880962cb726614113674e871398eb9c070f35c / native catalog 751aed14. Full offline regression passed 157/157 on Windows and isolated Linux with no source/catalog drift; sanitized public suite passed23/23, guarded-admission fixtures40/40 and11 protected kernels unchanged. Default staged and pre-push secret checks passed.
