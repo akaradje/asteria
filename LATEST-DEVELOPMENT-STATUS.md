@@ -1,3 +1,9 @@
+## Preserve verified pre-dispatch cancellation — 2026-10-15T18:34:08.946469+07:00 Asia/Bangkok
+
+Keep verified cancellation terminal after a trade deadline. Resolve superseded histories through bilateral original journals and fresh owned native readbacks, preserving SHA-256 archives and permanent original UUID fences. Missing, corrupt or contradictory evidence remains quarantined; a resolution does not manufacture a successful transfer receipt. Include structured refinement budget failure evidence.
+
+Added offline regression coverage for cancelled histories, stale contexts, late contradictions, damaged archives, interrupted certificate writes and UUID replay blocking. Production deployment and native readback are verified separately.
+
 ## Native trade budget leases and historical reserve rebases — 2026-10-15T16:29:51.674329+07:00 Asia/Bangkok
 
 Use an authenticated pre-session budget with fresh exact native offers inside a bounded lease, retaining owner/build/generation and reserve checks. Process terminal receipt and close events even after coordinator completion, and preserve mixed confirm/cancel histories for reconciliation.

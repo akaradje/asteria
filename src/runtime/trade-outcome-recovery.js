@@ -27,12 +27,16 @@ function archive(i,r){
 async function reconcile(i,{persist,ownsSession},now=Date.now()){
  const r=i.tradeJournal;if(!r||!['VERIFYING','UNCERTAIN','CONFIRMED','CONFIRM_SENT','CANCELLED'].includes(r.phase)||!eligible(i,r,now))return false;
  if(recorded(r,i.character.name)){persist(i);return false;}
+ // A positive pre-dispatch cancellation is terminal, not an unknown payment.
+ if(require('./trade-no-dispatch').cancelled(r)&&!(i.teamTradeIntent?.quarantined||[]).some(q=>q.id===r.id&&q.resolution==='unresolved_no_replay')){persist(i);return false;}
  if(i.tradeReadbackFlight||!i.canDo?.('recordedTradeReadback',30000)||await ownsSession(i))return false;
  const receipt=r.receipt,captured=receipt?.id!=null&&Number.isSafeInteger(receipt.rev)&&Number.isFinite(r.doneAt)&&r.doneAt===receipt.at&&Number.isFinite(r.confirmAt)&&r.confirmAt>=r.at&&r.doneAt>=r.confirmAt&&r.sent?.confirm===true;
  if(!captured&&!(Number.isFinite(r.deadline)&&now>r.deadline))return false;
  i.tradeReadbackFlight=true;
  try{
   const a=await require('./isolated-storage').readback(i);if(!eligible(i,r,Date.now())||await ownsSession(i))return false;
+  if(require('./trade-no-dispatch').certify(i,r,a)){persist(i);return false;}
+  if(require('./trade-no-dispatch').cancelled(r)){persist(i);return false;}
   const p=captured?proof(i,r,a):null;archive(i,r);
   r.readbackRecovery={...r.readbackRecovery,at:Date.now(),currentProof:a?.proof||null,replayed:false,historicalSuccessKnown:!!p};
   if(p){r.after=p.after;r.afterAt=p.at;r.nativeInventoryProof=p;r.phase='CONFIRMED';r.reason='Original native receipt and exact current server inventory delta; no command resent';persist(i);return true;}
@@ -73,6 +77,7 @@ function discoverMixed(root,host,members,known,now=Date.now()){
  }
  const found=[];
  for(const [id,pair]of pairs){if(pair.length!==2||pair[0].name===pair[1].name)continue;const a=pair[0].row,b=pair[1].row;
+  if(pair.every(x=>require('./trade-no-dispatch').cancelled(x.row)))continue;
   if(JSON.stringify(a.offer)!==JSON.stringify(b.offer)||!pair.some(x=>x.row.sent?.confirm)&&!pair.some(x=>x.row.phase==='UNCERTAIN')||!pair.some(x=>x.row.phase==='CANCELLED')||pair.every(x=>x.row.phase==='CANCELLED'&&x.row.nativeCloseEvidence))continue;
   const hash=require('./material-budget-recovery').preserve(root,{version:1,kind:'mixed_trade_history',original:pair,replayBlocked:true});
   found.push({id,offer:a.offer,build:a.build,phase:'UNCERTAIN',at:now,startedAt:Math.min(a.at,b.at),deadline:Math.max(a.deadline,b.deadline),finishedAt:now,quarantinedAt:now,resolution:'unresolved_no_replay',reason:'Original mixed terminal actor journals require both-side reconciliation',originalSha256:hash,replayBlocked:true});

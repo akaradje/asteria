@@ -20,7 +20,10 @@ class TeamTrade{
    if(found.length){this.quarantined.push(...found);fs.mkdirSync(path.dirname(this.quarantineFile),{recursive:true});fs.writeFileSync(this.quarantineFile+'.tmp',JSON.stringify(this.quarantined));fs.renameSync(this.quarantineFile+'.tmp',this.quarantineFile);}
   }
   let recovered=false;
+  for(const q of this.quarantined)if(require('./trade-no-dispatch').resolve(this.root,q,members,this.machine,cat.build,now))recovered=true;
   for(const q of this.quarantined.filter(q=>q.resolution==='unresolved_no_replay')){
+   // Positive no-dispatch histories await bilateral closure, not UNKNOWN-budget rebase.
+   if(require('./trade-no-dispatch').candidate(this.root,q,members,this.machine))continue;
    if(require('./material-budget-recovery').resolve(this.root,q,members,this.machine,cat.build,now)){recovered=true;continue;}
    const pair=[q.offer?.donor,q.offer?.receiver].map(name=>{const m=members.find(m=>m.charName===name);return m?{m,s:m.teamTradeStatus?.id===q.id?m.teamTradeStatus:m.teamTradeStatus?.recoveredOutcomes?.find(s=>s.id===q.id)}:null;});
    if(pair.every(x=>x?.s?.phase==='CONFIRMED'&&x.s.recordedNativeConfirmation===true&&x.s.nativeInventoryProof?.actorId===x.m.identity?.actorId&&x.s.id===q.id&&x.s.offer?.donor===q.offer.donor&&x.s.offer?.receiver===q.offer.receiver&&x.s.offer?.kind===q.offer.kind&&x.s.offer?.name===q.offer.name&&x.s.offer?.quantity===q.offer.quantity&&freshStatus(x.s,now))&&sameSession(pair[0].s.receiptId,pair[1].s.receiptId)){q.resolution='resolved_original_receipts_and_native_inventory';q.resolvedAt=now;q.receiptId=pair[0].s.receiptId;recovered=true;}
@@ -162,10 +165,13 @@ function refineMaterialBudget(i,intent){
  const frozen=require('./trade-material-budget').frozen(i,intent);
  if(!frozen&&(!i.lastSaveAt||Date.now()-i.lastSaveAt>30000))return false;
  const work=frozen?.work||require('../planning/team-workboard').project(i),m={teamWork:work,teamInventory:{materials:frozen?.materials||i.lastSave?.materials||{}}};
- if(i.character.name===o.donor)return !i.lastSave?.locks?.includes(o.name)&&(i.lastSave?.materials?.[o.name]||0)-require('../planning/team-workboard').ownKeep(m,o.name)>=o.quantity;
- const need=work.needs.find(n=>n.kind==='refine'&&n.goalId===o.goalId&&n.name===o.name);return !!need&&need.want-require('../planning/team-workboard').available(m,o.name)>=o.quantity;
+  const have=i.lastSave?.materials?.[o.name]||0,keep=require('../planning/team-workboard').ownKeep(m,o.name),available=require('../planning/team-workboard').available(m,o.name),need=work.needs.find(n=>n.kind==='refine'&&n.goalId===o.goalId&&n.name===o.name);
+  const donor=i.character.name===o.donor,allowed=donor?!i.lastSave?.locks?.includes(o.name)&&have-keep>=o.quantity:!!need&&need.want-available>=o.quantity;
+  i.tradeBudgetCheck={at:Date.now(),id:intent.id,goalId:o.goalId,material:o.name,quantity:o.quantity,donor,have,keep,available,want:need?.want??null,reserved:work.reserved?.[o.name]||0,frozen:!!frozen,allowed,reason:allowed?null:donor?'donor_locked_or_insufficient_surplus':!need?'refine_goal_no_longer_eligible':'receiver_shortfall_smaller_than_offer'};return allowed;
 }
 async function tick(i,screen){
+ // Reject stale coordinator attempts before they can rewrite a closed journal.
+ if(['GATHERING','SESSION'].includes(i.teamTradeIntent?.phase)&&require('./trade-no-dispatch').blocked(i,i.teamTradeIntent.id))return null;
  if(i.character?.name&&i.root&&!i.tradeJournal){try{const name=crypto.createHash('sha256').update(i.character.name).digest('hex').slice(0,24),latest=path.join(i.root,'logs/trades',name+'.json'),saved=JSON.parse(fs.readFileSync(latest));if(/^[a-zA-Z0-9-]{1,80}$/.test(saved.id||'')&&['VERIFYING','UNCERTAIN','CONFIRMED','CONFIRM_SENT'].includes(saved.phase)){i.tradeJournal=saved;i.tradeJournalFile=path.join(i.root,'logs/trades',name,saved.id+'.json');i.tradeJournalLatest=latest;}}catch{}}
  if(i.tradeJournal)await observeNativeOutcome(i,persist);
  if(i.tradeJournal)await require('./trade-outcome-recovery').reconcile(i,{persist,ownsSession});
@@ -176,7 +182,7 @@ async function tick(i,screen){
  if(i.character?.name&&i.root)await reconcileClosedCancellation(i);
  const intent=i.teamTradeIntent,name=i.character?.name;if(!intent?.offer||![intent.offer.donor,intent.offer.receiver].includes(name)||intent.build!==i.catalog().build)return null;
    // Budget rebase never makes the historical UUID dispatchable again.
-   if(require('./material-budget-recovery').replayBlocked(i,intent.id))return null;
+ if(require('./material-budget-recovery').replayBlocked(i,intent.id)||require('./trade-no-dispatch').blocked(i,intent.id))return null;
  // A verified original outcome cannot be downgraded by a stale coordinator.
  if(i.tradeJournal?.id===intent.id&&i.tradeJournal.phase==='CONFIRMED'){persist(i);return null;}
  if(terminal(intent.phase)){
@@ -192,7 +198,7 @@ async function tick(i,screen){
  if((Date.now()-intent.at>20000&&!await protocolLease(i,intent))||Date.now()>intent.deadline){const stale=journal(i,intent);if(await ownsSession(i)&&!stale.sent.cancel){stale.sent.cancel=true;persist(i);await i.socialSend('trcancel');}stale.phase='UNCERTAIN';stale.reason='Coordinator stale or deadline expired; no replay';persist(i);return 'trade stopped: stale coordinator';}
  const r=journal(i,intent),donor=name===intent.offer.donor,partner=donor?intent.offer.receiver:intent.offer.donor;const config=require('../planning/cross-party').roster(i.root);if(!config.members.some(m=>m.charName===partner))return null;
  const frame=async type=>{const x=await i.socialLast(type);return x&&x._receivedAt>=intent.startedAt?x:null;};
- const finish=(phase,reason)=>{r.phase=phase;r.reason=reason;persist(i);return 'team trade: '+phase+' '+(reason||'');};
+  const finish=(phase,reason)=>{r.phase=phase;r.reason=reason;if(i.tradeBudgetCheck?.id===r.id&&i.tradeBudgetCheck.allowed===false)r.budgetFailure={...i.tradeBudgetCheck};persist(i);return 'team trade: '+phase+' '+(reason||'');};
  if(['CONFIRMED','CANCELLED','UNCERTAIN'].includes(r.phase)){const active=await ownsSession(i);if(r.phase==='UNCERTAIN'&&active&&!r.sent.cancel){r.sent.cancel=true;persist(i);await i.socialSend('trcancel');}persist(i);return active?'team trade outcome: '+r.phase+'; waiting for owned session close':null;}
  if(screen.death||require('./room-policy').roomPolicy(require('./room-policy').currentRoom(i)).dungeon)return finish('CANCELLED','protected room or death');
  const existing=await i.socialLast('tropen');if(existing&&(existing.with?.name!==partner||existing._receivedAt<intent.startedAt)){const ended=await i.socialLast('trclosed'),completed=await i.socialLast('trdone'),receiptEnded=completed?.with===existing.with?.name&&completed._receivedAt>=existing._receivedAt;if(!sameSession(ended?.id,existing.id)&&!receiptEnded)return finish('CANCELLED','another trade owns the client; leave it untouched');}

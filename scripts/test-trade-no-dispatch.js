@@ -1,0 +1,37 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+const no=require('../src/runtime/trade-no-dispatch'),recovery=require('../src/runtime/trade-outcome-recovery'),runtime=require('../src/runtime/team-trade'),storage=require('../src/runtime/isolated-storage'),fresh=require('../src/runtime/freshness');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'asteria-no-dispatch-')),now=Date.now(),id=crypto.randomUUID(),sha=x=>crypto.createHash('sha256').update(x).digest('hex');
+const offer={kind:'material',name:'Starmetal',quantity:4,donor:'A',receiver:'B',goalKind:'refine',goalId:'hat'},members=['A','B','C'].map((charName,n)=>({charName,machine:'vps',status:'playing',identity:{actorId:'actor-'+String.fromCharCode(97+n).repeat(32)},runtimeGeneration:'runtime-'+charName,lastSaveAt:now,tradeAvailability:{clear:true,at:now}}));
+const oldRead=storage.readback,oldGate=fresh.decisionGate;let reads=0,persists=0;
+function actor(m){const c={actorId:m.identity.actorId,build:'fixture',sessionStartedAt:now-900000,generation:1},r={id,offer,context:c,build:'fixture',at:now-700000,deadline:now-100000,before:m.charName==='A'?100:4,phase:'CANCELLED',sent:{},reason:'Refinement material budget changed before gathering'},dir=path.join(root,'logs/trades',sha(m.charName).slice(0,24)),file=path.join(dir,id+'.json');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(file,JSON.stringify(r));return {root,machine:'vps',character:{name:m.charName},actorIdentity:m.identity,actorOwner:{},registryV32:{store:{validateOwner:()=>true}},status:'playing',autoChores:true,v2:{sourceCoherence:{matches:true},observations:{sessionId:m.runtimeGeneration}},bagSessionStartedAt:now-60000,socialInbox:{generation:2},tradeAvailability:m.tradeAvailability,lastSaveAt:now,catalog:()=>({build:'fixture'}),canDo:()=>true,tradeJournal:r,tradeJournalFile:file,teamTradeIntent:{id:crypto.randomUUID(),phase:'CONFIRMED',quarantined:[]}};}
+function readback(i){return {proof:{authority:'server_readback',actorId:i.actorIdentity.actorId,build:'fixture',sessionStartedAt:i.bagSessionStartedAt,generation:2,rev:100,at:Date.now(),requestAt:Date.now()-10},state:{materials:{Starmetal:4}}};}
+const helpers={persist:i=>{persists++;fs.writeFileSync(i.tradeJournalFile,JSON.stringify(i.tradeJournal));},ownsSession:async()=>false};
+(async()=>{try{
+ fs.mkdirSync(path.join(root,'machines'),{recursive:true});fs.writeFileSync(path.join(root,'machines/host-teams.json'),JSON.stringify({version:1,teams:{vps:{leader:'A',members:['A','B','C']}}}));fs.writeFileSync(path.join(root,'machines/topology-v32.json'),JSON.stringify({version:1,revision:1,coordinatorHost:'vps',leader:'A',hosts:{vps:{id:'vps',enabled:true,adapter:'legacy_verified_controller'}},members:members.map((m,slot)=>({charName:m.charName,machine:'vps',slot,enabled:true}))}));
+ const actors=members.slice(0,2).map(actor);fresh.decisionGate=()=>({allowed:true});storage.readback=async i=>{reads++;return readback(i);};
+ for(const i of actors){await recovery.reconcile(i,helpers);assert.equal(i.tradeJournal.phase,'CANCELLED');}assert.equal(reads,0,'Expired positive cancellations never create unknown outcomes or unnecessary probes');
+ const q={id,offer,phase:'UNCERTAIN',resolution:'unresolved_no_replay',replayBlocked:true};
+ for(const i of actors){const original=fs.readFileSync(i.tradeJournalFile);recovery.archive(i,i.tradeJournal);assert(fs.readFileSync(path.join(root,'logs/migration-originals/trades',i.tradeJournal.readbackRecovery.originalHash+'.json')).equals(original));i.tradeJournal.phase='UNCERTAIN';helpers.persist(i);i.teamTradeIntent.quarantined=[q];}
+ // Preserve original derived UNKNOWN journal; add a separate resolution and fence.
+ const before=actors.map(i=>fs.readFileSync(i.tradeJournalFile));
+ assert(no.candidate(root,q,members,'vps'),'Verified cancellation gets priority over generic unknown-budget rebase');
+ for(const i of actors)await recovery.reconcile(i,helpers);
+ assert.equal(reads,2);assert(actors.every(i=>no.blocked(i,id)));assert(actors.every((i,n)=>fs.readFileSync(i.tradeJournalFile).equals(before[n])));
+ assert(no.resolve(root,q,members,'vps','fixture',Date.now()));assert.equal(q.resolution,'resolved_not_dispatched');assert(q.replayBlocked);
+ // A stale coordinator attempting this exact UUID cannot reach any native dispatch API.
+ for(const i of actors){i.teamTradeIntent={id,offer,build:'fixture',phase:'GATHERING',at:now,deadline:now+10000,quarantined:[]};i.socialLast=async()=>null;assert.equal(await runtime.tick(i,{}),null);}
+ const saved=JSON.parse(JSON.stringify(q));assert.equal(no.resolve(root,q,members,'vps','fixture',now+60000),false,'Closed evidence does not expire back into UNKNOWN solely from elapsed time');
+ // Late contradicting receipt/session evidence reopens quarantine, but UUID stays fenced.
+ const i=actors[0],row=JSON.parse(fs.readFileSync(i.tradeJournalFile));fs.writeFileSync(i.tradeJournalFile,JSON.stringify({...row,sessionId:87,sent:{confirm:true},receipt:{id:87}}));assert(no.resolve(root,q,members,'vps','fixture'));assert.equal(q.resolution,'unresolved_no_replay');assert(no.blocked(i,id));fs.writeFileSync(i.tradeJournalFile,JSON.stringify(row));
+ // Fresh certificate owner/generation and current clear native availability are required.
+ for(const change of [{runtimeGeneration:'wrong'},{lastSaveAt:now-31000},{tradeAvailability:{clear:false,at:now}},{actionOwner:'paid'}]){const test={...saved,resolution:'unresolved_no_replay'};assert.equal(no.resolve(root,test,[{...members[0],...change},...members.slice(1)],'vps','fixture'),false);}
+ const missing={...saved,resolution:'unresolved_no_replay'};fs.renameSync(i.tradeJournalFile,i.tradeJournalFile+'.saved');assert.equal(no.resolve(root,missing,members,'vps','fixture'),false,'Missing journal cannot be interpreted as empty sent flags');fs.renameSync(i.tradeJournalFile+'.saved',i.tradeJournalFile);
+ for(const change of [{sent:{confirm:true}},{sessionId:9},{confirmAt:now},{sent:{unexpected:false}},{sent:null}])assert.equal(no.original(root,{...row,...change}),null);
+ // No central ledger row is invented: positive owned original journals are mandatory.
+ const h=actors[1].tradeJournal.readbackRecovery.originalHash,archive=path.join(root,'logs/migration-originals/trades',h+'.json'),bytes=fs.readFileSync(archive);fs.writeFileSync(archive,'corrupt');assert.equal(no.resolve(root,{...saved,resolution:'unresolved_no_replay'},members,'vps','fixture'),false);assert(no.blocked(actors[1],id));fs.writeFileSync(archive,bytes);
+ const cert=path.join(root,'logs/trade-no-dispatch',i.actorIdentity.actorId,id+'.json');fs.writeFileSync(cert,'corrupt');assert(no.blocked(i,id),'Corrupt fence still prevents dispatch');assert.equal(no.resolve(root,{...saved,resolution:'unresolved_no_replay'},members,'vps','fixture'),false);
+ // Interruption before certificate completion leaves no bilateral resolution.
+ fs.renameSync(cert,cert+'.tmp');assert(no.blocked(i,id));assert.equal(no.resolve(root,{...saved,resolution:'unresolved_no_replay'},members,'vps','fixture'),false);fs.renameSync(cert+'.tmp',cert);
+ console.log('PASS no-dispatch cancellation stability, bilateral historical closure, SHA originals, stale owner/save, missing/corrupt evidence, interrupted certificate, late contradiction and original UUID dispatch fence');
+ }finally{storage.readback=oldRead;fresh.decisionGate=oldGate;fs.rmSync(root,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});
