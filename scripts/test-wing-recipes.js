@@ -4,7 +4,10 @@ const root=require('path').resolve(__dirname,'..'),build=economy.newestBuild(roo
 // T5 is an Epic prerequisite, not the persistent Legendary equipment goal.
 // Exercise the legacy generic investment path separately from capped wingPlan ownership.
 const legacyCat={...cat,equipmentGoal:{enabled:false}};
-assert.equal(cat.wingRecipes.length,12);assert(cat.wingRecipes.every(r=>r.verified));
+const nativeWings=require('../src/knowledge/development-source').constructedRecipes(require('fs').readFileSync(require('path').join(root,'cache',build,'asteria-online.io/asteria-online-visual-polish.html'),'utf8'),cat).filter(r=>r.type==='wing');
+assert.deepEqual(cat.wingRecipes.map(r=>r.resultId).sort(),nativeWings.map(r=>r.out.item).sort(),'Wiki must cover exactly the loaded native wing recipes');
+assert(cat.wingRecipes.every(r=>r.verified));
+for(const r of cat.wingRecipes){const native=nativeWings.find(n=>n.out.item===r.resultId);assert.equal(r.reqLv,native.reqLv);assert.deepEqual(r.cost,Object.fromEntries(Object.entries(native.cost).map(([k,v])=>[k==='coins'?'Copper':k.startsWith('item:')?wings[k.slice(5)].name:k,v])),'every current wing retains exact native cost');}
 function make(job,held=[],materials={},coins=1000000,lv=120,recipes=wiki.crafting.recipes){return economy.wingPlan({job,held,materials,coins,lv,world:cat.world,items:cat.items,wings,recipes});}
 for(const job of Object.values(economy.BASE_TO_PROMOTED)){
  const p=make(job);assert.equal(p.tier,5);assert.equal(p.reqLv,60);assert.equal(p.coinsNeeded,150000);assert.equal(p.totalCost.Copper,650000);assert.equal(p.totalCost['Celestial Plume'],8);assert(p.chainNote);
@@ -31,4 +34,4 @@ try{
  const altered=structuredClone(wiki);altered.crafting.recipes.find(r=>r.resultId==='halo_feather_wing').cost['Ancient Bark']=999;fs.writeFileSync(file,JSON.stringify(altered));assert(!economy.loadCatalog(temp,build).items.halo_feather_wing.recipeVerified,'changed Wiki invalidates a cached successful verification');
  fs.writeFileSync(file,JSON.stringify(wiki));assert(economy.loadCatalog(temp,build).items.halo_feather_wing.recipeVerified,'repaired source is retried without restarting');
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
-console.log('PASS all 12 live Wiki/client recipes, six class chains, exact T5/T6/total bills, prerequisite consumption, level/class gates, reserves, craft selection, completed wings and unknown/mismatched formula blocking');
+console.log('PASS all '+nativeWings.length+' live Wiki/client recipes, six class chains, exact T5/T6/total bills, prerequisite consumption, level/class gates, reserves, craft selection, completed wings and unknown/mismatched formula blocking');

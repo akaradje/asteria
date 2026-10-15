@@ -27,6 +27,9 @@ assert(require('../src/knowledge/native-contract').validate(text,'craft').allowe
  const snippet="const EXCHANGE=[];for(const w of AsteriaWorld.EQUIPMENT.filter(i=>(i.jobs||[]).every(AsteriaWorld.newClassOpen)))EXCHANGE.push(RX('gear',{item:w.id},{coins:100},1));";
  const world={NEWCLASS:{future:{open:false},released:{open:true}},EQUIPMENT:[{id:'future_item',jobs:['future']},{id:'open_item',jobs:['released']},{id:'old_item',jobs:['existing']}],newClassOpen:id=>!NEWCLASS[id]||!!NEWCLASS[id].open};
  assert.deepEqual(review.constructedRecipes(snippet,{world}).map(r=>r.out.item),['open_item','old_item'],'sandbox preserves native class availability without host callbacks');
+ const capped="const EXCHANGE=[RX('wing',{item:'future_wing'},{coins:150000},AsteriaWorld.MAX_LV)];";let calls=0;
+ assert.equal(review.constructedRecipes(capped,{world:{...world,MAX_LV:120,unapproved:()=>{calls++;}}})[0].reqLv,120,'plain native constants survive data projection');assert.equal(calls,0,'native callables are not executed by data projection');
+ assert.throws(()=>review.constructedRecipes("const EXCHANGE=[RX('wing',{item:'future_wing'},{coins:AsteriaWorld.unapproved()},120)];",{world:{...world,unapproved:()=>{calls++;}}}),/unapproved recipe data call/);assert.equal(calls,0);
  for(const fn of [()=>true,id=>process.exit(),id=>!NEWCLASS[id]||!!NEWCLASS[id].enabled])assert.throws(()=>review.constructedRecipes(snippet,{world:{...world,newClassOpen:fn}}),/predicate requires review/);
 }
 {

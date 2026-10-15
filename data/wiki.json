@@ -33476,6 +33476,78 @@
         "sellPrice": 6750,
         "droppedBy": []
       },
+      "chainbound_wing": {
+        "name": "Chainbound Wing",
+        "slot": "wing",
+        "tier": 5,
+        "reqLv": 60,
+        "rarity": "epic",
+        "jobs": [
+          "soulbinder"
+        ],
+        "stats": {
+          "atk": 25,
+          "def": 22,
+          "hp": 500,
+          "st_vit": 4,
+          "st_str": 3
+        },
+        "desc": "ปีกเหล็กดำพันด้วยโซ่วิญญาณสีม่วง ข้อโซ่เรืองแสงเบา ๆ ทุกครั้งที่ขยับ",
+        "wing": {
+          "c1": "#b8a8d8",
+          "c2": "#3a2a5a",
+          "edge": "#c8a8ff",
+          "glow": 10119904,
+          "part": "spark",
+          "partCol": 12624127,
+          "rate": 5,
+          "flap": [
+            0.11,
+            0.09,
+            1.8
+          ],
+          "size": 1
+        },
+        "sellPrice": 4130,
+        "droppedBy": []
+      },
+      "fatechain_wing": {
+        "name": "Fatechain Wing",
+        "slot": "wing",
+        "tier": 6,
+        "reqLv": 88,
+        "rarity": "legendary",
+        "jobs": [
+          "soulbinder"
+        ],
+        "class3Only": true,
+        "stats": {
+          "atk": 45,
+          "def": 38,
+          "hp": 1000,
+          "damageReduction": 0.03,
+          "st_vit": 8,
+          "st_str": 6
+        },
+        "desc": "ปีกโซ่ชะตาสีม่วงทอง ข้อโซ่ลอยวนรอบปีกและเรืองแสงเมื่อผูกพันธนาการ",
+        "wing": {
+          "c1": "#e0c8ff",
+          "c2": "#2a1050",
+          "edge": "#ffd76a",
+          "glow": 11565823,
+          "part": "mote",
+          "partCol": 14203135,
+          "rate": 9,
+          "flap": [
+            0.14,
+            0.11,
+            1.7
+          ],
+          "size": 1.15
+        },
+        "sellPrice": 6750,
+        "droppedBy": []
+      },
       "sandstorm_cleaver": {
         "id": "sandstorm_cleaver",
         "name": "Sandstorm Cleaver",
@@ -33633,6 +33705,34 @@
         "stats": {
           "atk": 40,
           "aspdPct": 0.05
+        },
+        "affinity": "earth",
+        "region": 2,
+        "craftOnly": true,
+        "arsenal": true,
+        "craft": {
+          "ess": 6,
+          "frag": 4,
+          "core": 1,
+          "coin": 40000
+        },
+        "desc": "อาวุธหลอม Tier 2 · ธาตุคู่ดิน: น้ำมันธาตุดินอยู่นาน 2 เท่าและแรงขึ้น · ใส่กับเซ็ตเกราะ Tier 2 ครบ 3 ชิ้นได้โบนัส 4 ชิ้น (ดาเมจใส่มอนภาคนั้น +8%, วิ่งเร็ว +5%)",
+        "sellPrice": 900,
+        "droppedBy": []
+      },
+      "sandbind_sickle": {
+        "id": "sandbind_sickle",
+        "name": "Sandbind Sickle",
+        "slot": "weapon",
+        "reqLv": 25,
+        "tier": 2,
+        "jobs": [
+          "soulbinder"
+        ],
+        "rarity": "rare",
+        "stats": {
+          "atk": 39,
+          "crit": 0.05
         },
         "affinity": "earth",
         "region": 2,
@@ -33820,6 +33920,34 @@
         "sellPrice": 3000,
         "droppedBy": []
       },
+      "frostlink_sickle": {
+        "id": "frostlink_sickle",
+        "name": "Frostlink Sickle",
+        "slot": "weapon",
+        "reqLv": 45,
+        "tier": 3,
+        "jobs": [
+          "soulbinder"
+        ],
+        "rarity": "rare",
+        "stats": {
+          "atk": 70,
+          "crit": 0.05
+        },
+        "affinity": "water",
+        "region": 3,
+        "craftOnly": true,
+        "arsenal": true,
+        "craft": {
+          "ess": 6,
+          "frag": 4,
+          "core": 1,
+          "coin": 60000
+        },
+        "desc": "อาวุธหลอม Tier 3 · ธาตุคู่น้ำ: น้ำมันธาตุน้ำอยู่นาน 2 เท่าและแรงขึ้น · ใส่กับเซ็ตเกราะ Tier 3 ครบ 3 ชิ้นได้โบนัส 4 ชิ้น (ดาเมจใส่มอนภาคนั้น +8%, วิ่งเร็ว +5%)",
+        "sellPrice": 3000,
+        "droppedBy": []
+      },
       "cinderforge_sword": {
         "id": "cinderforge_sword",
         "name": "Cinderforge Sword",
@@ -33977,6 +34105,34 @@
         "stats": {
           "atk": 107,
           "aspdPct": 0.05
+        },
+        "affinity": "fire",
+        "region": 4,
+        "craftOnly": true,
+        "arsenal": true,
+        "craft": {
+          "ess": 6,
+          "frag": 4,
+          "core": 1,
+          "coin": 80000
+        },
+        "desc": "อาวุธหลอม Tier 4 · ธาตุคู่ไฟ: น้ำมันธาตุไฟอยู่นาน 2 เท่าและแรงขึ้น · ใส่กับเซ็ตเกราะ Tier 4 ครบ 3 ชิ้นได้โบนัส 4 ชิ้น (ดาเมจใส่มอนภาคนั้น +8%, วิ่งเร็ว +5%)",
+        "sellPrice": 4500,
+        "droppedBy": []
+      },
+      "emberchain_sickle": {
+        "id": "emberchain_sickle",
+        "name": "Emberchain Sickle",
+        "slot": "weapon",
+        "reqLv": 65,
+        "tier": 4,
+        "jobs": [
+          "soulbinder"
+        ],
+        "rarity": "epic",
+        "stats": {
+          "atk": 105,
+          "crit": 0.05
         },
         "affinity": "fire",
         "region": 4,
@@ -34164,6 +34320,34 @@
         "sellPrice": 8250,
         "droppedBy": []
       },
+      "voidbind_sickle": {
+        "id": "voidbind_sickle",
+        "name": "Voidbind Sickle",
+        "slot": "weapon",
+        "reqLv": 85,
+        "tier": 5,
+        "jobs": [
+          "soulbinder"
+        ],
+        "rarity": "epic",
+        "stats": {
+          "atk": 145,
+          "crit": 0.05
+        },
+        "affinity": "dark",
+        "region": 5,
+        "craftOnly": true,
+        "arsenal": true,
+        "craft": {
+          "ess": 6,
+          "frag": 4,
+          "core": 1,
+          "coin": 100000
+        },
+        "desc": "อาวุธหลอม Tier 5 · ธาตุคู่มืด: น้ำมันธาตุมืดอยู่นาน 2 เท่าและแรงขึ้น · ใส่กับเซ็ตเกราะ Tier 5 ครบ 3 ชิ้นได้โบนัส 4 ชิ้น (ดาเมจใส่มอนภาคนั้น +8%, วิ่งเร็ว +5%)",
+        "sellPrice": 8250,
+        "droppedBy": []
+      },
       "skyward_oathblade": {
         "id": "skyward_oathblade",
         "name": "Skyward Oathblade",
@@ -34333,6 +34517,38 @@
           "atk": 222,
           "crit": 0.05,
           "aspdPct": 0.05
+        },
+        "class3Only": true,
+        "craftOnly": true,
+        "arsenal": true,
+        "craft": {
+          "ess": 6,
+          "frag": 4,
+          "core": 1,
+          "coin": 140000,
+          "extra": {
+            "Starmetal": 10
+          }
+        },
+        "desc": "อาวุธหลอมคลาส 3 Lv 100 · คลาสสูงใช้ได้ด้วย",
+        "sellPrice": 13500,
+        "droppedBy": []
+      },
+      "soulchain_reaper": {
+        "id": "soulchain_reaper",
+        "name": "Soulchain Reaper",
+        "slot": "weapon",
+        "reqLv": 100,
+        "tier": 7,
+        "jobs": [
+          "fatebinder"
+        ],
+        "rarity": "legendary",
+        "stats": {
+          "atk": 228,
+          "def": 20,
+          "crit": 0.03,
+          "bossDmg": 0.06
         },
         "class3Only": true,
         "craftOnly": true,
@@ -35817,6 +36033,34 @@
           "st_agi": 6
         },
         "desc": "ปีกหงส์เพลิงประดับกลีบบัวทอง ลุกโชนไม่มีวันดับ"
+      },
+      "chainbound_wing": {
+        "name": "Chainbound Wing",
+        "line": "soulbinder",
+        "tier": 5,
+        "stats": {
+          "atk": 25,
+          "def": 22,
+          "hp": 500,
+          "st_vit": 4,
+          "st_str": 3
+        },
+        "desc": "ปีกเหล็กดำพันด้วยโซ่วิญญาณสีม่วง ข้อโซ่เรืองแสงเบา ๆ ทุกครั้งที่ขยับ"
+      },
+      "fatechain_wing": {
+        "name": "Fatechain Wing",
+        "line": "soulbinder",
+        "tier": 6,
+        "from": "chainbound_wing",
+        "stats": {
+          "atk": 45,
+          "def": 38,
+          "hp": 1000,
+          "damageReduction": 0.03,
+          "st_vit": 8,
+          "st_str": 6
+        },
+        "desc": "ปีกโซ่ชะตาสีม่วงทอง ข้อโซ่ลอยวนรอบปีกและเรืองแสงเมื่อผูกพันธนาการ"
       }
     },
     "consumables": {
@@ -42408,6 +42652,35 @@
           "Abyss Crystal": 3,
           "Copper": 500000
         }
+      },
+      {
+        "type": "wing",
+        "result": "Chainbound Wing",
+        "resultId": "chainbound_wing",
+        "reqLv": 60,
+        "cost": {
+          "Celestial Plume": 2,
+          "Ancient Bark": 5,
+          "Pharaoh Gold": 5,
+          "Wyrm Scale": 5,
+          "Warden Core": 5,
+          "Copper": 150000
+        }
+      },
+      {
+        "type": "wing",
+        "result": "Fatechain Wing",
+        "resultId": "fatechain_wing",
+        "reqLv": 88,
+        "cost": {
+          "Chainbound Wing": 1,
+          "Celestial Plume": 6,
+          "Tyrant Ember": 8,
+          "Behemoth Horn": 8,
+          "Morvane Chain": 5,
+          "Abyss Crystal": 3,
+          "Copper": 500000
+        }
       }
     ]
   },
@@ -47024,7 +47297,7 @@
           "id": "jobs",
           "icon": "🌳",
           "title": "สายอาชีพ",
-          "lead": "Wayfarer → อาชีพหลัก 6 สาย → อาชีพขั้น 3 (เลเวล 60) → High Class (เลเวล 99 + Job 50)",
+          "lead": "Wayfarer → อาชีพหลัก 7 สาย → อาชีพขั้น 3 (เลเวล 60) → High Class (เลเวล 99 + Job 50)",
           "tables": [
             {
               "title": "ทุกสายอาชีพ",
@@ -47070,6 +47343,12 @@
                   "นักหมัด",
                   "Iron Lotus",
                   "Asura"
+                ],
+                [
+                  "Soulbinder",
+                  "นักผูกพันธนาการ",
+                  "Fatebinder",
+                  "Oathkeeper"
                 ]
               ]
             }
@@ -47086,7 +47365,7 @@
           "lead": "ต้องการ เลเวล 99 · Job 50 · 100,000 Copper · แกนบอสภูมิภาคอย่างละ 1: Ancient Bark, Pharaoh Gold, Wyrm Scale, Tyrant Ember, Abyss Crystal",
           "tables": [
             {
-              "title": "High Class ทั้ง 6",
+              "title": "High Class ทั้ง 7",
               "head": [
                 "High Class",
                 "มาจาก",
@@ -47144,6 +47423,297 @@
             "Job สูงสุด 70 · เลเวลสูงสุดของเกม 120",
             "เปลี่ยนแล้วกลับเป็นอาชีพขั้น 3 ไม่ได้ ใช้ได้กับอาวุธ Tier 7 (Lv 100+)",
             "บัตรย้ายสายอาชีพ (ร้านพรีเมียม 300 Coins หรือ 3,000,000 Copper): High Class ย้ายไป High Class สายอื่นได้ เลเวลและ Job อยู่ครบ สกิลรีเซ็ต อุปกรณ์ที่ใส่ทั้งหมดถูกถอดเข้ากระเป๋า (ต้องมีช่องว่างพอ) และได้บัตรรีเซ็ตสเตตัสฟรี 1 ใบ"
+          ]
+        },
+        {
+          "id": "binder",
+          "icon": "⛓️",
+          "title": "สายใหม่: Soulbinder → Fatebinder → Oathkeeper",
+          "lead": "สายเคียวโซ่ ตีระยะกลาง ผูกมอนเข้าด้วยกันให้เจ็บพร้อมกัน ผูกตัวเองกับบอสให้ตีแรงขึ้นและโดนเบาลง และผูกเพื่อนเพื่อรับดาเมจแทน ถึก คุมฝูง และช่วยทีม",
+          "facts": [
+            [
+              "เปลี่ยนอาชีพ",
+              "Wayfarer Job 10 → Soulbinder ที่ Job Master · Lv 60 + Job 50 → Fatebinder · Lv 99 + Job 50 → Oathkeeper"
+            ],
+            [
+              "สเตตัสแนะนำ",
+              "STR กับ VIT หลัก (ตีแรงเน้น STR, แท็งก์เน้น VIT) · DEX 40–60 ให้ตีโดนและลดคูลดาวน์ · INT 10–20 ให้ MP พอ · AGI แค่ช่วงต้น · LUK ไม่ต้องอัพ · ดูตารางแนวอัพสเตตัสด้านล่าง"
+            ],
+            [
+              "อาวุธ / มือรอง",
+              "เคียวโซ่ (Chain Sickle) T1–T5 · Fate Sickle / Oathsever Scythe (ขั้น 3) · Oathbound Reaver / Bondbreaker Scythe / Covenant Harrow (High Class) · มือรองเป็นโล่ T1–T7"
+            ],
+            [
+              "ชุดเกราะ",
+              "ใส่ชุดเกราะหนักทุกชุด และชุดสายเบา (ชุดเดียวกับนักฆ่า นักธนู ม๊อง) · เครื่องประดับสายเบา · ปีก Chainbound Wing (T5) → Fatechain Wing (T6) · อาวุธหลอม Sandbind / Frostlink / Emberchain / Voidbind Sickle และ Soulchain Reaper (Lv 100)"
+            ],
+            [
+              "ระยะตี",
+              "ตีธรรมดาได้จากระยะ 4.5 ม. (เหวี่ยงโซ่) · สกิลโซ่ไกล 8–9 ม."
+            ],
+            [
+              "โซ่วิญญาณ (Soul Chain)",
+              "ผูกเป้ากับมอนที่ใกล้ที่สุดในระยะ 6 ม. ตีตัวหนึ่ง อีกตัวโดน 25% (Lv 10) · ผูกได้ 2 เส้นพร้อมกัน · ห่างกันเกิน 12 ม. โซ่ขาด"
+            ],
+            [
+              "สะท้อนหนาม",
+              "มอน / ผู้เล่นที่ติดโซ่ของเราแล้วตีเรา โดนสะท้อน 12% ของดาเมจ (Soul Chain Lv 10, PvP ครึ่งเดียว)"
+            ],
+            [
+              "Binding Vow",
+              "ผูกตัวเองกับเป้า: เราตีเป้านั้นแรงขึ้น 4% ต่อเลเวล และโดนมันตีเบาลง 1.5% ต่อเลเวล 12 วินาที · ใช้กับบอสคุ้มที่สุด"
+            ],
+            [
+              "Iron Tether",
+              "ผูกเพื่อนในปาร์ตี้ที่เลือดน้อยสุดในระยะ 12 ม. รับดาเมจของเพื่อนแทน 3% ต่อเลเวล · ไม่มีเพื่อนใกล้ = ใช้ไม่ได้ (ปุ่มจะจางและมี 👥)"
+            ],
+            [
+              "Chain Web (ขั้น 3)",
+              "ผูกมอนในวง 6 ม. ได้สูงสุด 6 ตัวเป็นใยเดียว ตีตัวไหน ตัวอื่นโดน 8% ทุกตัว"
+            ],
+            [
+              "Shatter Bond (ขั้น 3)",
+              "ทุบทุกโซ่ที่ถืออยู่ แรงขึ้น 10% ต่อโซ่ แล้วโซ่ขาดหมด · ผูกให้เยอะก่อนค่อยทุบ"
+            ],
+            [
+              "Grave Anchor / Fate Swap (ขั้น 3)",
+              "สมอตรึงมอนธรรมดาในวง 4 ม. (บอสโดนช้าแทน) · Fate Swap สลับ % เลือดกับเพื่อนที่ผูก Iron Tether อยู่ ใช้ตอนเพื่อนใกล้ตาย"
+            ],
+            [
+              "High Class ชุด A (คำสาบาน)",
+              "Oath of Many ผูกเพื่อนทุกคนในระยะ 10 ม. รับแทน 15% · Last Oath รับดาเมจที่จะทำให้เพื่อนตายแทน 1 ครั้งทุก 60 วินาที (Lv 5) · Oath Ward ช่วงแรกสะท้อนดาเมจแรงมาก (Lv 5: 60% + 1.5% ของ HP เรา ทุกครั้งที่โดนตี นาน 4 วินาที) แก้ทางสายตีรัว"
+            ],
+            [
+              "High Class ชุด B (ทุบโซ่)",
+              "Soul Rend ×1.5 ใส่เป้าที่ติดโซ่ / ใย / Vow / Doom · Chain Storm ผูกทุกตัวที่โดนเป็นใย · Doom Link อีก 10 วินาทีเป้าโดนซ้ำ 30% ของดาเมจทั้งหมดที่โดนในช่วงนั้น (Lv 10)"
+            ]
+          ],
+          "tables": [
+            {
+              "title": "แนวอัพสเตตัสตามเลเวล",
+              "head": [
+                "เลเวล",
+                "แนว",
+                "STR",
+                "AGI",
+                "VIT",
+                "INT",
+                "DEX",
+                "LUK",
+                "ใช้แต้ม"
+              ],
+              "rows": [
+                [
+                  "Lv 30",
+                  "ทั่วไป",
+                  "40",
+                  "12",
+                  "40",
+                  "10",
+                  "25",
+                  "1",
+                  "164 / 165"
+                ],
+                [
+                  "Lv 60",
+                  "ทั่วไป",
+                  "55",
+                  "20",
+                  "60",
+                  "20",
+                  "40",
+                  "1",
+                  "315 / 315"
+                ],
+                [
+                  "Lv 99",
+                  "ตีแรง (ชุด B / เล่นเดี่ยว)",
+                  "90",
+                  "4",
+                  "70",
+                  "20",
+                  "50",
+                  "1",
+                  "510 / 510"
+                ],
+                [
+                  "Lv 99",
+                  "แท็งก์ (ชุด A / ปาร์ตี้)",
+                  "70",
+                  "4",
+                  "90",
+                  "20",
+                  "50",
+                  "1",
+                  "510 / 510"
+                ],
+                [
+                  "Lv 120",
+                  "ตีแรง (ชุด B / เล่นเดี่ยว)",
+                  "99",
+                  "1",
+                  "80",
+                  "13",
+                  "60",
+                  "1",
+                  "615 / 615"
+                ],
+                [
+                  "Lv 120",
+                  "แท็งก์ (ชุด A / ปาร์ตี้)",
+                  "80",
+                  "1",
+                  "99",
+                  "13",
+                  "60",
+                  "1",
+                  "615 / 615"
+                ]
+              ]
+            },
+            {
+              "title": "สกิล Soulbinder",
+              "head": [
+                "สกิล",
+                "ชนิด",
+                "เลเวลสูงสุด",
+                "ผล (เลเวลสูงสุด)"
+              ],
+              "rows": [
+                [
+                  "Soul Chain",
+                  "โจมตี",
+                  "10",
+                  "เหวี่ยงโซ่วิญญาณใส่เป้า ATK ×8.8 แล้วผูกกับมอนที่ใกล้ที่สุดในรัศมี 6 ม. นาน 18 วิ: ตีตัวหนึ่ง อีกตัวโดนด้วย 25% · เป้าที่ติดโซ่ / คำสาบานของเรา ตีเราแล้วโดนสะท้อนกลับ 12% (PvP ครึ่งหนึ่ง)"
+                ],
+                [
+                  "Chain Lash",
+                  "โจมตี",
+                  "10",
+                  "เหวี่ยงโซ่รอบตัว รัศมี 3.5 ม. ATK ×4.2 (มอนที่ผูกโซ่ไว้ส่งดาเมจต่อกันด้วย)"
+                ],
+                [
+                  "Binding Vow",
+                  "โจมตี",
+                  "10",
+                  "ผูกตัวเองกับเป้า 12 วิ: เราตีมันแรงขึ้น 40% และมันตีเราเบาลง 15% (ATK ×5.6)"
+                ],
+                [
+                  "Iron Tether",
+                  "บัฟ",
+                  "10",
+                  "ผูกโซ่กับเพื่อนในปาร์ตี้ที่เลือดเหลือน้อยที่สุดในระยะ 12 ม. นาน 22 วิ: รับดาเมจแทนเพื่อน 30% (ค่าลดดาเมจของเรายังใช้ได้)"
+                ],
+                [
+                  "Chain Pull",
+                  "โจมตี",
+                  "5",
+                  "กระชากมอนธรรมดาเข้ามาหาตัว สตั๊น 0.5 วิ (บอส / มินิบอสแค่ชะงัก) ATK ×3.8"
+                ],
+                [
+                  "Unbroken",
+                  "ติดตัว",
+                  "5",
+                  "MaxHP +10% ลดดาเมจที่ได้รับ 5% และ ATK +5% (ติดตัว)"
+                ]
+              ]
+            },
+            {
+              "title": "สกิล Fatebinder",
+              "head": [
+                "สกิล",
+                "ชนิด",
+                "เลเวลสูงสุด",
+                "ผล (เลเวลสูงสุด)"
+              ],
+              "rows": [
+                [
+                  "Chain Web",
+                  "โจมตี",
+                  "10",
+                  "ใยโซ่วิญญาณรอบตัว 6 ม. ATK ×5 มอนในวงสูงสุด 6 ตัวถูกผูกเป็นใยเดียว 10 วิ: ตีตัวไหน ตัวอื่นในใยโดนด้วย 8%"
+                ],
+                [
+                  "Shatter Bond",
+                  "โจมตี",
+                  "10",
+                  "ทุบโซ่ทุกเส้นที่ผูกไว้ให้แตก มอนทุกตัวที่ติดโซ่หรือใยของเรา (ไกลสุด 12 ม.) โดน ATK ×25.5 แรงขึ้น 10% ต่อโซ่หนึ่งเส้น ถ้าไม่มีโซ่ ตีรอบตัว 4 ม."
+                ],
+                [
+                  "Fate Swap",
+                  "บัฟ",
+                  "1",
+                  "สลับเลือด (เป็น %) กับเพื่อนที่ผูก Iron Tether อยู่ ถ้าเพื่อนเลือดน้อยกว่าเรา เพื่อนได้ส่วนที่มากกว่าไป ต้องมีเพื่อนผูกโซ่อยู่"
+                ],
+                [
+                  "Grave Anchor",
+                  "โจมตี",
+                  "5",
+                  "ปักสมอวิญญาณรอบตัว 4 ม. ATK ×5.6 มอนธรรมดาเดินไม่ได้ 6 วิ มินิบอส / บอสช้าลง 40%"
+                ],
+                [
+                  "Chainmaster",
+                  "ติดตัว",
+                  "5",
+                  "ผูกโซ่ได้เพิ่ม 1 เส้น ส่วนแบ่งดาเมจโซ่ +5% โซ่อยู่นานขึ้น 5 วิ ATK +30% (ติดตัว)"
+                ]
+              ]
+            },
+            {
+              "title": "สกิล Oathkeeper",
+              "head": [
+                "สกิล",
+                "ชนิด",
+                "เลเวลสูงสุด",
+                "ผล (เลเวลสูงสุด)"
+              ],
+              "rows": [
+                [
+                  "Oath of Many",
+                  "บัฟ",
+                  "10",
+                  "ผูกคำสาบานกับเพื่อนในปาร์ตี้ทุกคนในระยะ 10 ม. นาน 15 วิ: รับดาเมจแทนเพื่อน 15% (ค่าลดดาเมจของเรายังใช้ได้) ต้องมีเพื่อนอยู่ใกล้"
+                ],
+                [
+                  "Last Oath",
+                  "ติดตัว",
+                  "5",
+                  "เพื่อนที่เราผูกโซ่ไว้โดนตีตาย เราจะรับครั้งนั้นแทนทั้งหมด ทุก 60 วิ (ติดตัว)"
+                ],
+                [
+                  "Oath Ward",
+                  "บัฟ",
+                  "5",
+                  "ปราการคำสาบาน 30 วิ: ดาเมจที่รับแทนเพื่อนผ่านโซ่เบาลง 40% · 4 วิแรกสะท้อนทุกครั้งที่โดนตี 60% ของดาเมจ + 1.5% ของ HP สูงสุดเรา (ยิ่งตีถี่ยิ่งโดนหนัก) ใช้คนเดียวได้"
+                ],
+                [
+                  "Soul Rend",
+                  "โจมตี",
+                  "10",
+                  "ฉีกวิญญาณด้วยเคียวโซ่ ATK ×22.4 แรงขึ้น 50% ถ้าเป้าติดโซ่ ใย คำสาบาน หรือ Doom Link ของเรา · PvP: ลงทันทีไม่ต้องง้าง คูลดาวน์ 7 วิ"
+                ],
+                [
+                  "Chain Storm",
+                  "โจมตี",
+                  "10",
+                  "พายุโซ่รอบตัว รัศมี 6 ม. ATK ×4.4 มอนที่โดนถูกผูกเป็นใยเดียวกัน (ส่วนแบ่งเท่า Chain Web)"
+                ],
+                [
+                  "Doom Link",
+                  "โจมตี",
+                  "10",
+                  "โซ่มรณะ ATK ×5.1 อีก 10 วิ เป้าโดนซ้ำ 30% ของดาเมจทั้งหมดที่มันโดนระหว่างนั้น (จากทุกคน) · PvP: ลงทันทีไม่ต้องง้าง คูลดาวน์ 8 วิ"
+                ]
+              ]
+            }
+          ],
+          "points": [
+            "เล่นเดี่ยว: ผูก Soul Chain ก่อนแล้วตี Chain Lash (LINK วนกันได้) มอน 2 ตัวตายพร้อมกัน · เจอบอสเปิด Binding Vow ก่อน",
+            "ขั้น 3: Chain Web ใส่ฝูง → Shatter Bond ทุบ (LINK) → Soul Chain ผูกใหม่ วนซ้ำ · Grave Anchor ตรึงฝูงไว้ไม่ให้วิ่งหนี",
+            "เล่นปาร์ตี้: เปิด Iron Tether / Oath of Many ให้เพื่อนสายบาง (เวท นักบวช นักธนู) เราใส่ VIT เยอะ เพื่อนจะตายยากมาก",
+            "High Class: ชุด A = แท็งก์ทีม (ดาเมจตัวเองน้อย ต้องมีปาร์ตี้) · ชุด B = ตีแรงทั้งฝูง เหมาะเล่นเดี่ยวและฟาร์ม",
+            "PvP: โซ่ทำงานครึ่งเดียว · กดหลบ (Dodge) ตัดโซ่ที่ศัตรูผูกเราได้ · Oath Ward ช่วงแรกใช้รับมือสายตีรัว",
+            "ดูลำดับอัพสกิลได้ที่หมวด แนวทางอัพสกิล → สาย Soulbinder"
           ]
         },
         {
@@ -47320,6 +47890,10 @@
             [
               "Dragon Knight ชุด B (Solar Aegis)",
               "เรียน Solar Aegis แล้วรับฮีลจากเพื่อนแรงขึ้น ×1.3 · DEF +8 ต่อเลเวลสกิล · Dawn Crash / Radiant Rampart ติดดีบัฟช้า / อ่อนแรงใส่บอส"
+            ],
+            [
+              "สาย Soulbinder (โซ่)",
+              "มอนที่ผูกโซ่ด้วยกันเจ็บด้วยกัน (25% ที่ Soul Chain Lv 10) · Iron Tether / Oath of Many รับดาเมจแทนเพื่อน · ตีธรรมดาได้ไกล 4.5 ม."
             ],
             [
               "Seraph Ward (Lumen Oracle)",
@@ -49744,7 +50318,7 @@
             ],
             [
               "เคล็ดลับ",
-              "Soul Chain ⇄ Chain Lash เป็นวง LINK · ผูกโซ่ก่อนแล้วค่อยตี มอนที่ผูกโดนด้วยกัน · Iron Tether ต้องมีเพื่อนในปาร์ตี้"
+              "Soul Chain ⇄ Chain Lash เป็นวง LINK · ผูกโซ่ก่อนแล้วค่อยตี มอนที่ผูกโดนด้วยกัน · ขั้น 3: Chain Web → Shatter Bond → Soul Chain วนซ้ำ · Binding Vow เปิดใส่บอส · Iron Tether ต้องมีเพื่อนในปาร์ตี้"
             ],
             [
               "High Class ชุด A",
@@ -51045,7 +51619,7 @@
               ]
             },
             {
-              "title": "อาวุธหลอม (30 ชิ้น)",
+              "title": "อาวุธหลอม (35 ชิ้น)",
               "head": [
                 "อาวุธ",
                 "เลเวล",
@@ -51097,6 +51671,13 @@
                   "แก่น 6 · หินดาว 4 · แกน 1 · 40,000 Copper"
                 ],
                 [
+                  "Sandbind Sickle",
+                  "Lv 25",
+                  "Soulbinder",
+                  "ดิน",
+                  "แก่น 6 · หินดาว 4 · แกน 1 · 40,000 Copper"
+                ],
+                [
                   "Rimecall Blade",
                   "Lv 45",
                   "Vanguard",
@@ -51135,6 +51716,13 @@
                   "Permafrost Claws",
                   "Lv 45",
                   "Ironfist",
+                  "น้ำ",
+                  "แก่น 6 · หินดาว 4 · แกน 1 · 60,000 Copper"
+                ],
+                [
+                  "Frostlink Sickle",
+                  "Lv 45",
+                  "Soulbinder",
                   "น้ำ",
                   "แก่น 6 · หินดาว 4 · แกน 1 · 60,000 Copper"
                 ],
@@ -51181,6 +51769,13 @@
                   "แก่น 6 · หินดาว 4 · แกน 1 · 80,000 Copper"
                 ],
                 [
+                  "Emberchain Sickle",
+                  "Lv 65",
+                  "Soulbinder",
+                  "ไฟ",
+                  "แก่น 6 · หินดาว 4 · แกน 1 · 80,000 Copper"
+                ],
+                [
                   "Voidborn Greatsword",
                   "Lv 85",
                   "Vanguard",
@@ -51223,6 +51818,13 @@
                   "แก่น 6 · หินดาว 4 · แกน 1 · 100,000 Copper"
                 ],
                 [
+                  "Voidbind Sickle",
+                  "Lv 85",
+                  "Soulbinder",
+                  "dark",
+                  "แก่น 6 · หินดาว 4 · แกน 1 · 100,000 Copper"
+                ],
+                [
                   "Skyward Oathblade",
                   "Lv 100",
                   "Dawnwarden",
@@ -51261,6 +51863,13 @@
                   "Comet Knuckles",
                   "Lv 100",
                   "Iron Lotus",
+                  "—",
+                  "แก่น 6 · หินดาว 4 · แกน 1 · 140,000 Copper"
+                ],
+                [
+                  "Soulchain Reaper",
+                  "Lv 100",
+                  "Fatebinder",
                   "—",
                   "แก่น 6 · หินดาว 4 · แกน 1 · 140,000 Copper"
                 ]
@@ -54600,6 +55209,7 @@
     "chain-t4",
     "chain-t5",
     "chain-t6",
+    "chainbound-wing",
     "charged-core",
     "cherub-feather",
     "cinder-chain-sickle",
@@ -54655,6 +55265,7 @@
     "ember-pike-grill",
     "ember-talisman",
     "ember-talon",
+    "emberchain-sickle",
     "emberfletch-quiver",
     "emberstalker-boots",
     "emberstalker-earring",
@@ -54672,6 +55283,7 @@
     "enchant-star-stone",
     "fallen-feather",
     "fate-sickle",
+    "fatechain-wing",
     "flame-oil",
     "flame-saber",
     "fly-wing",
@@ -54687,6 +55299,7 @@
     "frostfin-sashimi",
     "frostguard-earring",
     "frostguard-ring",
+    "frostlink-sickle",
     "frostpeak-seal",
     "frostplate",
     "frostweave-earring",
@@ -54879,6 +55492,7 @@
     "sage-tea",
     "salamander-tail",
     "sand-carp",
+    "sandbind-sickle",
     "sandstorm-cleaver",
     "sandstride-boots",
     "sapphire-potion",
@@ -54913,6 +55527,7 @@
     "slimy-skin",
     "solar-aegis-wing",
     "solaris-edge",
+    "soulchain-reaper",
     "sovereign-starheart",
     "sovereigns-halo",
     "specter-veil",
@@ -55014,6 +55629,7 @@
     "void-fists",
     "void-scepter",
     "void-talisman",
+    "voidbind-sickle",
     "voidborn-greatsword",
     "voidstrider-boots",
     "voidstrider-earring",
@@ -55051,21 +55667,21 @@
   ],
   "_source": {
     "url": "https://asteria-online.io/wiki/data.json",
-    "fetchedAt": 1792073483428,
-    "verifiedAt": 1792075471284,
-    "sha256": "98c81445b58376d50f60f319ba48df50a5109212c642eb8a7d9b5ce4af10281c",
-    "verifiedBuild": "200b7fc6+cf",
-    "verifiedWingRecipes": 12,
+    "fetchedAt": 1792078093204,
+    "verifiedAt": 1792078093204,
+    "sha256": "395254932ce8888a812704a8b28db72cb6625afcc0fb2c2afa5f956cffc031be",
+    "verifiedBuild": "751aed14",
+    "verifiedWingRecipes": 14,
     "domains": {
       "wings": {
         "state": "READY",
-        "build": "200b7fc6+cf",
-        "verifiedRecipes": 12,
+        "build": "751aed14",
+        "verifiedRecipes": 14,
         "reason": null
       },
       "cards": {
         "state": "DISCOVERED",
-        "build": "200b7fc6+cf",
+        "build": "751aed14",
         "authority": "wiki_not_runtime_outcome"
       }
     },

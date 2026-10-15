@@ -4,7 +4,9 @@ const semantics=require('./native-contract'),cached=new Map(),canonical=o=>JSON.
 function evaluate(code,input){semantics.dataConstruction(code);input={...input,...(input.AsteriaWorld?{AsteriaWorld:JSON.parse(JSON.stringify(input.AsteriaWorld))}:{}),...(input.ITEMS?{ITEMS:JSON.parse(JSON.stringify(input.ITEMS))}:{})};return vm.runInNewContext(code,input,{timeout:1000,contextCodeGeneration:{strings:false,wasm:false}});}
 function constructedRecipes(text,catalog){
  let code=semantics.recipeConstruction(text).replace(/EXCHANGE;$/, 'JSON.stringify(EXCHANGE);');
- const world=catalog?.world||{},data={EQUIPMENT:world.EQUIPMENT||[],MONSTERS:world.MONSTERS||[]};
+ // Preserve plain native constants such as MAX_LV used by new recipe data.
+ // evaluate() JSON-clones this object: native functions never enter the VM.
+ const world=catalog?.world||{},data={...world,EQUIPMENT:world.EQUIPMENT||[],MONSTERS:world.MONSTERS||[]};
  if(code.includes('AsteriaWorld.newClassOpen')){
   // The current native catalog filters unopened classes. Verify the pure
   // predicate structurally; recreate it inside the data VM, never inject an

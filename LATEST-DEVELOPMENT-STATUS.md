@@ -1,3 +1,9 @@
+## Exact native recipe data and closed-history progression recovery — 2026-10-15T22:47:44.261097+07:00 Asia/Bangkok
+
+Preserve plain World constants such as MAX_LV in the JSON-cloned recipe sandbox, with native host functions excluded and unapproved calls rejected. Wing regression compares every native recipe ID, cost and level, including newly added wings, instead of a fixed count. Exact native payment, fresh actor/build/session/generation proof, reserves, immutable archived UNKNOWN history and original UUID no-replay remain binding. This complements exact metadata-suffixed build identity and boot-query hashes.
+
+Final frozen Windows156/156 and isolated Linux156/156 PASS, protected safety11 unchanged, sanitized public21/21,724JavaScript/9Python syntax,52 private-value checks and staged secret scan PASS. Native loading, original preservation and six-character outcomes are verified separately after guarded remote rollout. Windows services/machine are not controlled.
+
 ## Exact native metadata regression verified — 2026-10-15T15:05:22.519362+00:00
 
 Windows156/156, isolated Linux156/156, public21/21 and11 protected boundaries PASS. Frozen source/native identities unchanged during complete checks.724JS/9Python syntax and52 private-value comparisons PASS; staged secret scan PASS. Exact native metadata and versioned bootstrap identities remain distinct from receipts or measured combat improvement.
