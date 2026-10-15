@@ -47,6 +47,8 @@ function installRuntimeV2(GameInstance){
    // Between owned ticks, a recoverable purchase gets an essential idle lane.
    // This never queues through protected work or the reduced optional budget.
    if(!this.tickBusy&&!this.choresBusy&&require('./purchase-rebase').inspect(this).state==='recoverable')await require('./paid-outcome-recovery').tick(this);
+   // Synchronous bookkeeping only while every current dispatcher is idle.
+   require('./material-budget-recovery').tick(this);
    // Keep native save evidence flowing during long owned routes. Request the
    // existing saver only; do not make its observation timestamp fresh ourselves.
    const saveNow=Date.now();if(this.lastSaveAt&&saveNow-this.lastSaveAt>=15000&&sample.connected&&!sample.paused&&!sample.fixed&&!sample.kicked&&v.sourceCoherence?.matches===true&&!roomPolicy(currentRoom(this)).dungeon&&saveNow-(v.keepFreshAskedAt||0)>=15000){

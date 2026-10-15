@@ -17,6 +17,7 @@ class TeamTrade{
   if(!terminal(r.phase)&&r.build!==cat.build){r.phase=r.phase==='GATHERING'?'CANCELLED':'UNCERTAIN';r.reason='Game build changed; stop old intent and replan';r.finishedAt=now;if(r.phase==='CANCELLED')r.evidence='not_dispatched_gathering_phase';this.save();}
   let recovered=false;
   for(const q of this.quarantined.filter(q=>q.resolution==='unresolved_no_replay')){
+   if(require('./material-budget-recovery').resolve(this.root,q,members,this.machine,cat.build,now)){recovered=true;continue;}
    const pair=[q.offer?.donor,q.offer?.receiver].map(name=>{const m=members.find(m=>m.charName===name);return m?{m,s:m.teamTradeStatus?.id===q.id?m.teamTradeStatus:m.teamTradeStatus?.recoveredOutcomes?.find(s=>s.id===q.id)}:null;});
    if(pair.every(x=>x?.s?.phase==='CONFIRMED'&&x.s.recordedNativeConfirmation===true&&x.s.nativeInventoryProof?.actorId===x.m.identity?.actorId&&x.s.id===q.id&&x.s.offer?.donor===q.offer.donor&&x.s.offer?.receiver===q.offer.receiver&&x.s.offer?.kind===q.offer.kind&&x.s.offer?.name===q.offer.name&&x.s.offer?.quantity===q.offer.quantity&&freshStatus(x.s,now))&&sameSession(pair[0].s.receiptId,pair[1].s.receiptId)){q.resolution='resolved_original_receipts_and_native_inventory';q.resolvedAt=now;q.receiptId=pair[0].s.receiptId;recovered=true;}
   }
@@ -134,6 +135,13 @@ function cancelUncommittedForSpace(i,now=Date.now()){
 }
 function protocolActive(i,now=Date.now()){const r=i.teamTradeIntent;return !!(r?.offer&&r.build===i.catalog().build&&[r.offer.donor,r.offer.receiver].includes(i.character?.name)&&!terminal(r.phase)&&(r.phase==='SESSION'||i.tradeJournal?.sessionId));}
 function cleanupPending(i){const r=i.teamTradeIntent,j=i.tradeJournal;return !!(r?.offer&&['UNCERTAIN','CANCELLED'].includes(r.phase)&&r.build===i.catalog().build&&[r.offer.donor,r.offer.receiver].includes(i.character?.name)&&j?.id===r.id&&j.sessionId&&!j.sent?.cancel);}
+function refineMaterialBudget(i,intent){
+ const o=intent.offer;if(o?.goalKind!=='refine')return true;
+ if(!i.lastSaveAt||Date.now()-i.lastSaveAt>30000||o.kind!=='material'||!Number.isSafeInteger(o.quantity)||o.quantity<=0||typeof o.goalId!=='string'||!i.catalog().items[o.goalId])return false;
+ const work=require('../planning/team-workboard').project(i),m={teamWork:work,teamInventory:{materials:i.lastSave?.materials||{}}};
+ if(i.character.name===o.donor)return !i.lastSave?.locks?.includes(o.name)&&(i.lastSave?.materials?.[o.name]||0)-require('../planning/team-workboard').ownKeep(m,o.name)>=o.quantity;
+ const need=work.needs.find(n=>n.kind==='refine'&&n.goalId===o.goalId&&n.name===o.name);return !!need&&need.want-require('../planning/team-workboard').available(m,o.name)>=o.quantity;
+}
 async function tick(i,screen){
  if(i.character?.name&&i.root&&!i.tradeJournal){try{const name=crypto.createHash('sha256').update(i.character.name).digest('hex').slice(0,24),latest=path.join(i.root,'logs/trades',name+'.json'),saved=JSON.parse(fs.readFileSync(latest));if(/^[a-zA-Z0-9-]{1,80}$/.test(saved.id||'')&&['VERIFYING','UNCERTAIN','CONFIRMED'].includes(saved.phase)){i.tradeJournal=saved;i.tradeJournalFile=path.join(i.root,'logs/trades',name,saved.id+'.json');i.tradeJournalLatest=latest;}}catch{}}
  if(i.tradeJournal)await require('./trade-outcome-recovery').reconcile(i,{persist,ownsSession});
@@ -143,6 +151,8 @@ async function tick(i,screen){
  if(i.character?.name&&i.root)await reconcileIdleHistory(i);
  if(i.character?.name&&i.root)await reconcileClosedCancellation(i);
  const intent=i.teamTradeIntent,name=i.character?.name;if(!intent?.offer||![intent.offer.donor,intent.offer.receiver].includes(name)||intent.build!==i.catalog().build)return null;
+   // Budget rebase never makes the historical UUID dispatchable again.
+   if(require('./material-budget-recovery').replayBlocked(i,intent.id))return null;
  // A verified original outcome cannot be downgraded by a stale coordinator.
  if(i.tradeJournal?.id===intent.id&&i.tradeJournal.phase==='CONFIRMED'){persist(i);return null;}
  if(terminal(intent.phase)){
@@ -163,7 +173,7 @@ async function tick(i,screen){
  if(screen.death||require('./room-policy').roomPolicy(require('./room-policy').currentRoom(i)).dungeon)return finish('CANCELLED','protected room or death');
  const existing=await i.socialLast('tropen');if(existing&&(existing.with?.name!==partner||existing._receivedAt<intent.startedAt)){const ended=await i.socialLast('trclosed'),completed=await i.socialLast('trdone'),receiptEnded=completed?.with===existing.with?.name&&completed._receivedAt>=existing._receivedAt;if(!sameSession(ended?.id,existing.id)&&!receiptEnded)return finish('CANCELLED','another trade owns the client; leave it untouched');}
  if(intent.phase==='GATHERING'){
-  if(!i.lastSaveAt||Date.now()-i.lastSaveAt>30000)return 'trade gather: fresh save required';await i.expeditionAuto(false);
+  if(!i.lastSaveAt||Date.now()-i.lastSaveAt>30000)return 'trade gather: fresh save required';if(!refineMaterialBudget(i,intent))return finish('CANCELLED','Refinement material budget changed before gathering');await i.expeditionAuto(false);
   if(i.livePos?.room!=='town'){const home=await i.returnToTown();if(!home.ok)return 'trade gather: waiting for town';}
   if(!donor&&intent.offer.kind==='gear'&&(i.catalog().world.bagCap?.(i.lastSave.bagTier||0)||0)-(i.lastSave.bag||[]).length<2){const expanded=await require('./wing-inventory').prepare(i,{minimum:2});if(!expanded.ok)return finish('CANCELLED','receiver inventory cannot be safely expanded: '+expanded.reason);}
   if(Math.hypot((i.livePos?.x||0)-160,(i.livePos?.z||0)-7)>3)await i.walkTo(160,7,{timeoutMs:60000,tolerance:2});
@@ -195,6 +205,7 @@ async function tick(i,screen){
   if(!donor&&!r.sent.accept){const invite=await frame('trinv');if(invite?.name===partner&&Date.now()-invite._receivedAt<25000){r.sent.accept=true;persist(i);await i.eval(`(async()=>{await window.AsteriaNet.flush();window.AsteriaNet.social('trans',{from:${JSON.stringify(invite.from)},ok:true});return true;})()`);}}
   return 'trade waiting for registered partner';
  }
+ if(!r.sent.confirm&&!refineMaterialBudget(i,intent)){if(r.sessionId&&!r.sent.cancel){r.sent.cancel=true;persist(i);await i.socialSend('trcancel');}return finish('CANCELLED','Refinement material demand or donor reserve changed');}
  if(!r.sent.offer){let gear=[],ids=[],stacks=[];if(donor&&intent.offer.kind==='gear'){const index=(i.lastSave.bag||[]).findIndex(x=>(typeof x==='string'?x:x.id)===intent.offer.id);if(index<0||rules.blockedGear(intent.offer.id,i.lastSave,i.catalog())){await i.socialSend('trcancel');return finish('CANCELLED','item moved or is not tradable');}gear=[index];ids=[intent.offer.id];}if(donor&&intent.offer.kind==='material')stacks=[[intent.offer.name,intent.offer.quantity]];
   r.sent.offer=true;r.offerAt=Date.now();persist(i);await i.socialSend('troffer',{sq:1,gear,ids,stacks,coins:donor&&intent.offer.kind==='currency'?intent.offer.quantity:0});return 'trade exact offer sent';}
  if(!state||!sameSession(state.id,r.sessionId)||state._receivedAt<Date.now()-15000)return 'trade waiting for fresh server offer';
@@ -204,4 +215,4 @@ async function tick(i,screen){
  if(state.me.locked&&state.them.locked&&!state.me.confirmed&&!r.sent.confirm){r.sent.confirm=true;r.confirmAt=Date.now();r.phase='CONFIRM_SENT';persist(i);await i.socialSend('trconfirm');return 'trade confirm sent; awaiting server receipt';}
  return 'trade waiting for matching receipt';
 }
-module.exports={TeamTrade,tick,quantity,protocolActive,cleanupPending,ownsSession,receiptMatches,inventoryProof,reconcileUnsentCancellation,noDispatch,blocksNavigation,releaseIdleNavigation,protocolLease,reconcileIdleHistory,reconcileClosedCancellation,recordedMaterialConfirmation,reconcileRecordedConfirmation,cancelUncommittedForSpace};
+module.exports={TeamTrade,tick,refineMaterialBudget,quantity,protocolActive,cleanupPending,ownsSession,receiptMatches,inventoryProof,reconcileUnsentCancellation,noDispatch,blocksNavigation,releaseIdleNavigation,protocolLease,reconcileIdleHistory,reconcileClosedCancellation,recordedMaterialConfirmation,reconcileRecordedConfirmation,cancelUncommittedForSpace};

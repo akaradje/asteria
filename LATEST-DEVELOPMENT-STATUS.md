@@ -1,3 +1,11 @@
+## Closed material budget recovery and separate refinement requests — 2026-10-15T14:45:44.036206+07:00 Asia/Bangkok
+
+Orphan legacy craft reservations can rebase current material budgets only after fresh authenticated ownership, closed old session, idle dispatchers, an exact verified native recipe bill, and an immutable original archive. Historical success and cost remain unknown; original UUIDs remain blocked across restart.
+
+Both participants must prove current native material balances in their registered local team before a closed refinement-ore transfer quarantine permits a new UUID. Original actor journals and coordinator evidence are archived; no historical transfer is marked successful by rebase. Freshness, runtime generation, protected work and active payment fences remain binding.
+
+Craft and refinement demands remain separate. Donors retain their own next refinement attempt and active holds; recipient demand and donor reserves are rechecked before new trade confirmation. Original transaction/ownership kernels unchanged. Offline validation and publication evidence are separate from live deployment and measured combat improvement.
+
 ## Closed refinement history and execution diagnostics — 2026-10-15T13:51:19.847824+07:00 Asia/Bangkok
 
 A missing historical refinement ledger baseline no longer permanently blocks an explicitly authorized, independently budgeted new UUID after fresh authenticated native ownership/session/generation readback. Original journal records remain unchanged; append-only SHA256 archives are persisted and flushed before preparing the new intent and verified again before native dispatch. Original UUIDs and current ambiguous outcomes cannot be resent. Corrupt archives and active work fail closed. No historical success or cost is invented.

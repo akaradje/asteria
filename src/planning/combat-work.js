@@ -1,14 +1,14 @@
 'use strict';
 const economy=require('../economy');
 // Missing inputs for an actual equipped upgrade, not a general collection list.
-function requirements(i,wiki,now=Date.now()){
+function requirements(i,wiki,now=Date.now(),{includeReady=false}={}){
  const s=i.lastSave||{},cat=i.catalog(),out=[];
  if(!require('../runtime/freshness').fresh(i.lastSaveAt,30000,now)||i.v2?.sourceCoherence?.matches!==true||wiki?._source?.verifiedBuild!==cat.build||!require('./progression-priority').assess(s,cat).equipmentAllowed)return out;
  const held=require('../runtime/paid-actions').heldResources(i),materials=Object.fromEntries(Object.entries(s.materials||{}).map(([k,n])=>[k,Math.max(0,n-(held[k]||0))]));
  const refine=economy.refinePlan({...s,materials,coins:Math.max(0,(s.coins||0)-(held.Copper||0)-require('../upgrade-reserve').reserve(s,cat.world)),items:cat.items,world:cat.world,wiki,state:s});
  for(const r of refine.steps||[]){
-  if(!require('../equipment-goal').policy(cat).dynamicProgression&&cat.items[r.id]?.rarity!=='legendary'||r.to>require('../equipment-goal').target(cat,r.slot)||!r.worthIt||r.oreHave>=r.oreNeed&&(!r.starNeed||(materials[r.starName]||0)>=r.starNeed))continue;
-  out.push({id:r.id,name:r.name+' +'+r.to,purpose:'refine',expectedCombatGain:r.valuation?.expectedGain,missing:[...(r.oreHave<r.oreNeed?[{name:r.oreName,have:r.oreHave,want:r.oreNeed}]:[]),...(r.starNeed&&(materials[r.starName]||0)<r.starNeed?[{name:r.starName,have:materials[r.starName]||0,want:r.starNeed}]:[])]});
+  if(!require('../equipment-goal').policy(cat).dynamicProgression&&cat.items[r.id]?.rarity!=='legendary'||r.to>require('../equipment-goal').target(cat,r.slot)||!r.worthIt||!includeReady&&r.oreHave>=r.oreNeed&&(!r.starNeed||(materials[r.starName]||0)>=r.starNeed))continue;
+  out.push({id:r.id,name:r.name+' +'+r.to,purpose:'refine',expectedCombatGain:r.valuation?.expectedGain,missing:[...(includeReady||r.oreHave<r.oreNeed?[{name:r.oreName,have:r.oreHave,want:r.oreNeed}]:[]),...(r.starNeed&&(includeReady||(materials[r.starName]||0)<r.starNeed)?[{name:r.starName,have:materials[r.starName]||0,want:r.starNeed}]:[])]});
  }
  const a=i.astralObjective;
  if((require('../equipment-goal').policy(cat).dynamicProgression||!require('./astral-path').equipmentPending(i))&&a?.build===cat.build&&require('../runtime/freshness').fresh(a.at,30000,now)&&(a.state==='gate_blocked'||a.gate===true)){

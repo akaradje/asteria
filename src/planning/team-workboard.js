@@ -19,19 +19,24 @@ function project(i){
   const key=JSON.stringify([i.catalog().build,s.job,s.lv,s.jobLv,s.bag,s.equip,s.refine,s.stage,s.materials,s.coins,s.petActive,s.qIndex,s.qv,s.stats,s.skills,s.holes,s.sockets,s.weaponOpts]);
   if(!i.teamCraftProjection||i.teamCraftProjection.key!==key||now-i.teamCraftProjection.at>=30000)i.teamCraftProjection={key,at:now,craft:require('../character-brain').profile(s,i.catalog(),require('../economy').loadWiki(i.root),{reserved:require('../runtime/paid-actions').heldResources(i),...require('../runtime/craft-scope').profileOptions(i)}).craft};
   const craft=i.teamCraftProjection.craft;
-  for(const [name,want]of Object.entries(craft?.cost||{}))if(!['Copper','coins','tokens','runeDust'].includes(name)&&!Object.values(i.catalog().items||{}).some(it=>it.name===name||it.id===name))needs.push({name,want,priority:30,kind:'craft'});
+  for(const [name,want]of Object.entries(craft?.cost||{}))if(!['Copper','coins','tokens','runeDust'].includes(name)&&!Object.values(i.catalog().items||{}).some(it=>it.name===name||it.id===name))needs.push({name,want,priority:30,kind:'craft',goalId:craft.id});
   const work=i.progressionWork;
   if(work?.build===i.catalog().build&&fresh(work.at,30000,now))for(const c of work.candidates||[])if(c.kind==='craft-work'&&c.monsterKind==='normal'&&c.acquisition?.finishable&&!needs.some(n=>n.name===c.material))needs.push({name:c.material,want:c.acquisition.want,priority:40,kind:'craft-alternative'});
  }
  if(require('../equipment-goal').policy(i.catalog()).dynamicProgression&&i.v2?.sourceCoherence?.matches===true){
-  for(const goal of require('./combat-work').requirements(i,require('../economy').loadWiki(i.root),now))for(const need of goal.missing||[])if(typeof need.name==='string'&&need.want>0&&!needs.some(n=>n.name===need.name)&&!Object.hasOwn(s.consumables||{},need.name))needs.push({name:need.name,want:need.want,priority:40,kind:goal.purpose,build:i.catalog().build,at:now,expectedCombatGain:goal.expectedCombatGain,expectedDurationMs:i.progressionWork?.candidates?.find(c=>c.itemId===goal.id)?.expectedDurationMs??null});
+  appendCombatNeeds(needs,require('./combat-work').requirements(i,require('../economy').loadWiki(i.root),now,{includeReady:true}),i,now);
  }
- const reserved=Object.fromEntries(Object.entries(i.v2?.reservations?.totals(i.catalog().build)||{}).filter(([,n])=>n>0));
+ const held={...(i.v2?.reservations?.totals(i.catalog().build)||{})};if(i.actorIdentity?.actorId)for(const [k,n]of Object.entries(i.registryV32?.store?.held(i.actorIdentity.actorId)||{}))held[k]=(held[k]||0)+n;
+ const reserved=Object.fromEntries(Object.entries(held).filter(([,n])=>n>0));
  const boss=i.socialInbox?.last?.('bossboard'),bossProof={ignar_the_flame_tyrant:s.bestiary?.ignar_the_flame_tyrant||0};
  const bossBoard=boss&&Number.isFinite(boss.now)&&fresh(boss._receivedAt,30000,now)?{_receivedAt:boss._receivedAt,now:boss.now,list:(boss.list||[]).filter(b=>b.id==='ignar_the_flame_tyrant'&&b.map==='n3').slice(0,1).map(b=>({id:b.id,map:b.map,up:!!b.up,next:Number.isFinite(b.next)?b.next:null}))}:null;
  const board=i.teamWorkboard,carry=board&&board.build===i.catalog().build&&fresh(board.at,15000,now)?board.allocation?.commitments?.find(c=>c.actorId===i.actorIdentity?.actorId&&c.name===(i.character?.name||i.credentials?.charName)&&c.deadline>now):null;
- return {carry:carry?{actorId:carry.actorId,build:board.build,host:i.machine,deadline:carry.deadline}:null,milestones:(()=>{const m=require('./progression-priority').assess(s,i.catalog());return {stage:m.stage,equipmentAllowed:m.equipmentAllowed};})(),equipment:(()=>{const m=require('../equipment-goal').assess(s,i.catalog());return m?{legendaryEquipped:m.legendaryEquipped,refine10Equipped:m.refine10Equipped,complete:m.complete}:null;})(),at:i.lastSaveAt,phase:p?.phase||'training',needs:needs.slice(0,24),reserved,bossProof,bossBoard,helperWaitUntil:milestoneWait(i,now)?i.bossWindow.departAt:null,helper:(p?.phase==='complete'||milestoneWait(i,now)||s.lv<i.catalog().world?.MAX_LV&&!p?.active&&s.lv>=40)&&!i.teamControl&&!i.dailyTeamPending&&!i.dailyWorkStatus?.ownsNavigation&&!i.v2?.trial?.active()&&i.v2?.sourceCoherence?.matches!==false&&(!i.teamTradeStatus?.phase||['IDLE','CONFIRMED','CANCELLED'].includes(i.teamTradeStatus.phase))&&(!i.pendingTravel||i.goal?.kind==='team-gather')&&!i.choresBusy&&!safetyHold(i,now)&&require('../runtime/survival').hpPots(s)>=20,
+ return {carry:carry?{actorId:carry.actorId,build:board.build,host:i.machine,deadline:carry.deadline}:null,milestones:(()=>{const m=require('./progression-priority').assess(s,i.catalog());return {stage:m.stage,equipmentAllowed:m.equipmentAllowed};})(),equipment:(()=>{const m=require('../equipment-goal').assess(s,i.catalog());return m?{legendaryEquipped:m.legendaryEquipped,refine10Equipped:m.refine10Equipped,complete:m.complete}:null;})(),at:i.lastSaveAt,phase:p?.phase||'training',needs:needs.sort((a,b)=>a.priority-b.priority).slice(0,24),reserved,bossProof,bossBoard,helperWaitUntil:milestoneWait(i,now)?i.bossWindow.departAt:null,helper:(p?.phase==='complete'||milestoneWait(i,now)||s.lv<i.catalog().world?.MAX_LV&&!p?.active&&s.lv>=40)&&!i.teamControl&&!i.dailyTeamPending&&!i.dailyWorkStatus?.ownsNavigation&&!i.v2?.trial?.active()&&i.v2?.sourceCoherence?.matches!==false&&(!i.teamTradeStatus?.phase||['IDLE','CONFIRMED','CANCELLED'].includes(i.teamTradeStatus.phase))&&(!i.pendingTravel||i.goal?.kind==='team-gather')&&!i.choresBusy&&!safetyHold(i,now)&&require('../runtime/survival').hpPots(s)>=20,
   blocked:Object.keys(i.brain?.blocked?.(now)||{}).slice(0,24),kills:i.goal?.monsterId?s.bestiary?.[i.goal.monsterId]||0:0,monsterId:i.goal?.monsterId||null};
+}
+function appendCombatNeeds(needs,goals,i,now){
+ for(const goal of goals)for(const need of goal.missing||[])if(typeof need.name==='string'&&need.want>0&&!needs.some(n=>n.name===need.name&&n.kind===goal.purpose&&n.goalId===goal.id)&&!Object.hasOwn(i.lastSave?.consumables||{},need.name))needs.push({name:need.name,want:need.want,priority:goal.purpose==='refine'?25:40,kind:goal.purpose,goalId:goal.id,build:i.catalog().build,at:now,expectedCombatGain:goal.expectedCombatGain,expectedDurationMs:i.progressionWork?.candidates?.find(c=>c.itemId===goal.id)?.expectedDurationMs??null});
+ return needs;
 }
 function holdings(m,name){return Number(m.teamInventory?.materials?.[name])||0;}
 function available(m,name){const held=Number(m.teamWork?.reserved?.[name]??m.teamInventory?.reserved?.[name]??0);return Number.isFinite(held)&&held>=0?Math.max(0,holdings(m,name)-held):0;}
@@ -93,4 +98,4 @@ function candidate(i,now=Date.now()){
  }
  return {...a,workId:a.id};
 }
-module.exports={TeamWorkboard,project,candidate,ownKeep,available,fresh,milestoneWait};
+module.exports={TeamWorkboard,project,candidate,ownKeep,available,fresh,milestoneWait,appendCombatNeeds};
