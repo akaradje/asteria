@@ -23,7 +23,8 @@ async function settled(i){
  catch(e){
   // Existing exact-owner capacity release is idempotent. No new grant, login,
   // native payment or enrollment may be retried through this boundary.
-  if(!grant||i.capacityGrant!==grant||i.actorOwner!==owner||i.globalAssignment!==assignment||i.enrollmentId||!['fetch failed','private_authority_unavailable'].includes(e.message))throw e;
+  const transport=['fetch failed','private_authority_unavailable','The operation was aborted due to timeout','This operation was aborted','The operation was aborted.'].includes(e.message);
+  if(!grant||i.capacityGrant!==grant||i.actorOwner!==owner||i.globalAssignment!==assignment||i.enrollmentId||!transport)throw e;
   throw Object.assign(Error('capacity settlement transport unavailable'),{code:'ASTERIA_CAPACITY_TRANSPORT_WAIT',capacityId:grant.id});
  }
 }
