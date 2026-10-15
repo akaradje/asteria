@@ -17,7 +17,7 @@ const a=new AutoBrain(root,advisor,()=>({id:1,ready:true}),async()=>{dispatches+
 await a.tick(now);assert.equal(calls,1);assert.equal(dispatches,1);await a.tick(now);assert.equal(calls,1);
 a.setEnabled(false);await a.tick(now+999999);assert.equal(calls,1);assert.equal(new AutoBrain(root,advisor,()=>({ready:true}),async()=>{}).data.enabled,false);
 a.setEnabled(true);a.data.nextAt=0;const gen=advisor.generate.bind(advisor);advisor.generate=async()=>{await gen();advisor.last.providers.typesafe.choices[0].confidence=.2;};await a.tick(Date.now());assert.equal(dispatches,1);
-a.data.nextAt=0;advisor.generate=async()=>{throw Error('private error')};await a.tick(Date.now());assert.equal(a.data.failures,1);assert(!a.busy);assert(a.data.nextAt>Date.now()+590000);
+a.data.nextAt=0;advisor.generate=async()=>{throw Error('private error')};await a.tick(Date.now());assert.equal(a.data.failures,1);assert(!a.busy);assert(a.data.nextAt>Date.now()+59000&&a.data.nextAt<=Date.now()+61000,'transient retry is bounded to sixty seconds');
 a.data.nextAt=0;advisor.generate=async()=>{await gen();a.setEnabled(false);};a.data.enabled=true;await a.tick(Date.now());assert.equal(dispatches,1);
 a.data.enabled=true;a.data.nextAt=0;
 advisor.generate=async()=>{await gen();advisor.last.plannerProvider='meta';advisor.last.providers.meta={ok:true};delete advisor.last.providers.openrouter;};

@@ -5,7 +5,7 @@ const {context,problemSlots,strategicSlots,REVIEW_MS}=require('./ai-advisor');
 const {eligible,actionable:nativeActionable}=require('./runtime/ai-command');
 const actionable=a=>a==='sync_game'||nativeActionable(a);
 class AutoBrain {
-  constructor(root,advisor,getFarm,dispatch,{systemRecovery}={}){this.root=root;this.advisor=advisor;this.getFarm=getFarm;this.dispatch=dispatch;this.systemRecovery=systemRecovery;this.file=path.join(root,'logs/ai-auto.json');this.data={enabled:true,nextAt:0,failures:0,history:[]};try{Object.assign(this.data,JSON.parse(fs.readFileSync(this.file,'utf8')));}catch{}this.busy=false;this.research=new(require('./learning/knowledge-research').KnowledgeResearch)(root);}
+  constructor(root,advisor,getFarm,dispatch,{systemRecovery}={}){this.root=root;this.advisor=advisor;this.getFarm=getFarm;this.dispatch=dispatch;this.systemRecovery=systemRecovery;this.file=path.join(root,'logs/ai-auto.json');this.data={enabled:true,nextAt:0,failures:0,history:[]};try{Object.assign(this.data,JSON.parse(fs.readFileSync(this.file,'utf8')));}catch{}if(this.data.failures)this.data.nextAt=Math.min(this.data.nextAt||0,Date.now()+60000);this.busy=false;this.research=new(require('./learning/knowledge-research').KnowledgeResearch)(root);}
   save(){fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.data,null,2));fs.renameSync(this.file+'.tmp',this.file);}
   view(){return {...this.data,busy:this.busy,research:this.research.view(),intervalMinutes:5,authority:{role:'strategic_controller',priority:'operator_then_ai_then_local_execution',reviewMinutes:REVIEW_MS/60000,execution:'native_verified',fallback:'delegated_local_controller'}};}
   setEnabled(enabled){this.data.enabled=enabled;this.data.nextAt=enabled?Date.now():this.data.nextAt;this.save();}
@@ -60,7 +60,9 @@ class AutoBrain {
     if(!slots.length){this.data.nextAt=now+60000;this.data.lastSkip='ทุกตัวกำลังคืบหน้าหรือทำงานเดิม รักษาแผนโดยไม่เรียก API';this.data.skippedRounds=(this.data.skippedRounds||0)+1;this.save();await this.research.tick(this.advisor,now,state);return;}
     this.busy=true;this.data.nextAt=now+300000;this.data.lastRequestedAt=now;this.data.lastSkip=null;this.save();
     try{
-      await this.advisor.generate({slots,mode:'controller'});const result=require('./learning/ai-recovery-fallback').select(this.advisor.last,state);
+      let result;try{await this.advisor.generate({slots,mode:'controller'});result=require('./learning/ai-recovery-fallback').select(this.advisor.last,state);}catch(e){result={at:new Date().toISOString(),snapshotAt:state.snapshotAt,plannerProvider:'external',providers:{external:{ok:false,errorCode:e.code||e.name||'provider_unavailable'}},plan:null};}
+      const external=result.plannerProvider;this.data.providerHealth={at:Date.now(),provider:external,ok:!!result.providers?.[external]?.ok,failures:result.providers?.[external]?.ok?0:(this.data.providerHealth?.failures||0)+1};
+      result=require('./learning/local-strategic-planner').select(result,state);
       const record={at:result.at,snapshotAt:result.snapshotAt,farmId:farm.id,authority:'strategic_controller',routineSlots:routine,efficiency:result.efficiency||null,baseline:state.members.filter(m=>slots.includes(m.slot)).map(m=>({slot:m.slot,...require('./learning/advice-outcome').metrics(m),busy:m.busy,goalMap:m.currentGoal?.mapId||null})),thoughts:result.plan?.members||[],decisions:[],outcomes:[]};
       const reviewed=m=>{const before=state.members.find(x=>x.slot===m.slot);this.data.authorityReviews||={};this.data.authorityReviews[before.actorId+':'+before.build]={at:Date.now(),action:m.action};this.data.authorityReviews=Object.fromEntries(Object.entries(this.data.authorityReviews).sort((a,b)=>b[1].at-a[1].at).slice(0,96));};
       const planner=result.plannerProvider||'openrouter';
@@ -71,7 +73,7 @@ class AutoBrain {
           status:result.plan?'proposal_not_verified':'provider_unavailable',resolved:false};
         this.data.diagnoses=[diagnosis,...(this.data.diagnoses||[]).filter(d=>!(d.actorId===m.actorId&&d.build===m.build&&d.incidentKey===diagnosis.incidentKey))].slice(0,96);
       }
-      const available=(['meta','openrouter'].includes(planner)||planner==='typesafe'&&['bounded_zero_spend_route_review','bounded_zero_spend_strategy'].includes(result.fallback?.mode))&&result.providers[planner]?.ok&&result.plan;
+      const available=(['local','meta','openrouter'].includes(planner)||planner==='typesafe'&&['bounded_zero_spend_route_review','bounded_zero_spend_strategy'].includes(result.fallback?.mode))&&result.providers[planner]?.ok&&result.plan;
       record.plannerProvider=planner;record.fallback=result.fallback||null;
       if(!available){this.data.failures++;record.note='API ไม่ครบ ใช้สมองเดิมต่อ';}
       else{
@@ -82,9 +84,9 @@ class AutoBrain {
           if(!actionable(m.action)){if(routine.includes(m.slot)&&['continue','observe'].includes(m.action)&&this.data.enabled&&this.getFarm()?.id===farm.id){try{const fresh=context(this.root),before=state.members.find(x=>x.slot===m.slot),after=fresh.members.find(x=>x.slot===m.slot);if(after?.actorId===before.actorId&&after.build===before.build&&strategicSlots(fresh,this.data.authorityReviews).includes(m.slot))reviewed(m);}catch{}}record.decisions.push({slot:m.slot,action:m.action,status:'AI มอบหมายให้ทำแผนเดิม/เก็บข้อมูล'});continue;}
           const incident=this.data.incidents?.find(r=>!r.resolved&&r.actorId===m.proposal?.actorId&&r.build===m.proposal?.build);
           if(incident?.playbook&&m.action!=='sync_game'&&!Object.hasOwn(FOCUSES,m.action)){const gate=require('./learning/incident-playbooks').gate(incident.playbook,incident.attempts,now);if(!gate.allow){record.decisions.push({slot:m.slot,action:m.action,status:gate.reason,nextCheck:gate.nextCheck,fallback:gate.fallback});continue;}}
-          const routing=require('./learning/provider-routing');const route=result.fallback?require('./learning/ai-recovery-fallback').route(result,m,state):routing.decision({planner:{...result.providers[planner],provider:planner},judge:{...j,ok:result.providers.typesafe?.ok===true},action:m.action,member:state.members.find(x=>x.slot===m.slot),proposal:m.proposal,benchmark:routing.load(this.root),now:Date.now()});if(!route.allowed){record.decisions.push({slot:m.slot,action:m.action,status:route.reason,route:route.route});continue;}
+          const routing=require('./learning/provider-routing');const route=result.fallback?(planner==='local'?require('./learning/local-strategic-planner').route(result,m,state):require('./learning/ai-recovery-fallback').route(result,m,state)):routing.decision({planner:{...result.providers[planner],provider:planner},judge:{...j,ok:result.providers.typesafe?.ok===true},action:m.action,member:state.members.find(x=>x.slot===m.slot),proposal:m.proposal,benchmark:routing.load(this.root),now:Date.now()});if(!route.allowed){record.decisions.push({slot:m.slot,action:m.action,status:route.reason,route:route.route});continue;}
           if(!this.data.enabled||this.getFarm()?.id!==farm.id){record.decisions.push({slot:m.slot,status:'ยกเลิก: ปิด AI หรือรอบเกมเปลี่ยน'});continue;}
-          let stillBlocked=false;try{const freshState=context(this.root),before=state.members.find(x=>x.slot===m.slot),after=freshState.members.find(x=>x.slot===m.slot),focus=Object.hasOwn(FOCUSES,m.action);stillBlocked=after?.actorId===before.actorId&&after.build===before.build&&(problemSlots(freshState).includes(m.slot)||focus&&routine.includes(m.slot)&&strategicSlots(freshState,this.data.authorityReviews).includes(m.slot))&&(!result.fallback||require('./learning/ai-recovery-fallback').route(result,m,freshState).allowed)&&(!(focus||route.route==='bounded_planner')||require('./learning/autonomous-policy').allowed(m.action,after,m.proposal,Date.now()));}catch{}
+          let stillBlocked=false;try{const freshState=context(this.root),before=state.members.find(x=>x.slot===m.slot),after=freshState.members.find(x=>x.slot===m.slot),focus=Object.hasOwn(FOCUSES,m.action);stillBlocked=after?.actorId===before.actorId&&after.build===before.build&&(problemSlots(freshState).includes(m.slot)||focus&&routine.includes(m.slot)&&strategicSlots(freshState,this.data.authorityReviews).includes(m.slot))&&(!result.fallback||(planner==='local'?require('./learning/local-strategic-planner').route(result,m,freshState):require('./learning/ai-recovery-fallback').route(result,m,freshState)).allowed)&&(!(focus||route.route==='bounded_planner')||require('./learning/autonomous-policy').allowed(m.action,after,m.proposal,Date.now()));}catch{}
           if(!stillBlocked){record.decisions.push({slot:m.slot,action:m.action,status:'ไม่แทรกแซง: ข้อมูลเปลี่ยนหรือกลับมาคืบหน้าแล้ว'});continue;}
           const command={id:result.at+':'+m.slot,actorId:m.proposal?.actorId,proposal:m.proposal,build:state.members.find(r=>r.slot===m.slot)?.build,slot:m.slot,action:m.action,reason:m.reason,expiresAt:Date.parse(result.snapshotAt)+120000};
           const reply=await this.dispatch(command);if(reply.ok!==false&&Object.hasOwn(FOCUSES,m.action))reviewed(m);require('./learning/incident-lifecycle').dispatched(this.data,{actorId:command.actorId,build:command.build,action:command.action,commandId:command.id,result:reply,at:Date.now()});record.decisions.push({slot:m.slot,commandId:command.id,actorId:command.actorId,action:m.action,status:reply.status,route:route.route,judge:j||null,chain:reply.ok===false?'rejected':'accepted_not_confirmed',proposal:m.proposal});
@@ -92,8 +94,8 @@ class AutoBrain {
       }
       this.data.history.unshift(record);this.data.history=this.data.history.slice(0,12);
       this.data.lastError=null;
-    }catch{this.data.failures++;this.data.lastError='ยังวิเคราะห์ไม่ได้ รอข้อมูลใหม่หรือบริการกลับมาพร้อม';}
-    finally{this.data.nextAt=Date.now()+Math.min(1800000,300000*Math.pow(2,Math.min(this.data.failures,3)));this.busy=false;this.save();}
+    }catch(e){this.data.failures++;this.data.lastError='controller_'+(e.code||e.name||'error');}
+    finally{this.data.nextAt=Date.now()+(this.data.failures||this.data.providerHealth?.ok===false?60000:300000);this.busy=false;this.save();}
   }
 }
 module.exports={AutoBrain,eligible};

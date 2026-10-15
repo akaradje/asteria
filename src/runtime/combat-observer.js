@@ -21,7 +21,7 @@ class CombatObserver {
   if(this.lab())return;
   if(this.id===null)return;
   if(m.t==='hres'&&Number.isSafeInteger(m.q)){if(this.seen.has(m.q))return;this.seen.add(m.q);if(this.seen.size>2048)this.seen.delete(this.seen.values().next().value);}
-  const i=this.instance();if(i)require('../learning/combat-evidence').ensure(i)?.frame(i,m,this.id,this.now());
+  const i=this.instance();if(i?.socialInbox?.power)i.socialInbox.power.combatDomain=require('../observability/combat-domain').classify(i.livePos?.room);if(i)require('../learning/combat-evidence').ensure(i)?.frame(i,m,this.id,this.now());
   if(m.t==='hres'&&Array.isArray(m.l)){this.pve=true;for(const h of m.l.slice(0,80))if(Array.isArray(h)&&Number.isFinite(h[1])&&h[1]>0)this.reports?.damage(this.slot,this.name(),h[1],this.now());return;}
   if(m.t==='phit'&&Number.isFinite(m.d)&&m.d>0)this.reports?.combatMetric(this.slot,this.name(),'damageTakenServer',m.d,this.now());
   if(m.t==='pheal'&&Number.isFinite(m.n)&&m.n>0)this.reports?.combatMetric(this.slot,this.name(),'healReceivedServer',m.n,this.now());

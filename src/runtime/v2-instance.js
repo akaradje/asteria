@@ -44,6 +44,9 @@ function installRuntimeV2(GameInstance){
    // action tick. It neither steals that owner nor dispatches a point action.
    if(this.actorIdentity&&sample.connected&&!sample.fixed&&!sample.kicked&&!sample.paused){try{await require('./research-poll').poll(this);try{require('../planning/market-shadow').observe(this);}catch{this.marketShadow={state:'OBSERVATION_UNAVAILABLE',mode:'shadow_no_transactions',executable:false};}await require('./astral').poll(this);require('./astral').observe(this);}catch{this.astralQueryStatus={at:Date.now(),requested:false,reason:'native_astral_observer_unavailable'};}}
    try{require('./grandmaster').observe(this,Date.now());v.intelligenceError=null;}catch{v.intelligenceError='combat_knowledge_unavailable_native_freshness_continues';}
+   // Between owned ticks, a recoverable purchase gets an essential idle lane.
+   // This never queues through protected work or the reduced optional budget.
+   if(!this.tickBusy&&!this.choresBusy&&require('./purchase-rebase').inspect(this).state==='recoverable')await require('./paid-outcome-recovery').tick(this);
    // Keep native save evidence flowing during long owned routes. Request the
    // existing saver only; do not make its observation timestamp fresh ourselves.
    const saveNow=Date.now();if(this.lastSaveAt&&saveNow-this.lastSaveAt>=15000&&sample.connected&&!sample.paused&&!sample.fixed&&!sample.kicked&&v.sourceCoherence?.matches===true&&!roomPolicy(currentRoom(this)).dungeon&&saveNow-(v.keepFreshAskedAt||0)>=15000){

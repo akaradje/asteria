@@ -3,10 +3,10 @@ const storage=require('./isolated-storage'),combat=require('../learning/combat-e
 const same=(a,b)=>storage.equal(a,b),terminal=r=>['CONFIRMED','CANCELLED'].includes(r.status);
 function baseline(i,now=Date.now()){
  const signature=combat.loadout(i.socialInbox.power?.enrich?.(i,{...i.lastSave})||i.lastSave),rows=i.combatEvidence?.data?.windows||[];
- return rows.map(combat.metrics).filter(r=>r.actorId===i.actorIdentity?.actorId&&r.build===i.catalog().build&&r.sourceSignature===i.v2.loadedSourceIdentity.signature&&r.session===i.actorOwner.session&&r.generation===i.socialInbox.generation&&r.loadoutSignature===signature&&r.ready&&!r.confounded&&!r.deaths&&r.at<=now&&now-r.at<3600000).at(-1)||null;
+ return require('../learning/combat-windows').aggregate(rows,{now}).map(combat.metrics).filter(r=>r.actorId===i.actorIdentity?.actorId&&r.build===i.catalog().build&&r.sourceSignature===i.v2.loadedSourceIdentity.signature&&r.session===i.actorOwner.session&&r.generation===i.socialInbox.generation&&r.loadoutSignature===signature&&r.ready&&r.observedMs>=300000&&!r.confounded&&!r.deaths&&r.at<=now&&now-r.at<3600000).at(-1)||null;
 }
 function improvement(a,b){
- if(!a||!b||!b.ready||b.confounded||b.deaths||b.startedAt<a.at||!['actorId','build','sourceSignature','session','generation','job','level','role','map','target','party'].every(k=>a[k]===b[k]))return false;
+ if(!a||!b||!b.ready||a.observedMs<300000||b.observedMs<300000||b.confounded||b.deaths||b.startedAt<a.at||!['actorId','build','sourceSignature','session','generation','job','level','role','map','target','party'].every(k=>a[k]===b[k]))return false;
  if((a.hasParty||b.hasParty)&&(!a.partySupport?.completeParty||!b.partySupport?.completeParty||a.partyObservationSignature!==b.partyObservationSignature))return false;
  if(a.role==='dps')return a.dps>0&&b.dps>=a.dps*1.05&&a.killsPerHour>0&&b.killsPerHour>=a.killsPerHour*1.05;
  if(a.role==='tank')return a.damageTakenPerSecond>0&&b.damageTakenPerSecond<=a.damageTakenPerSecond*.95&&b.potionsPerMinute<=a.potionsPerMinute&&b.killsPerHour>=a.killsPerHour*.8;

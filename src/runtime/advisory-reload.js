@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
-const modules=['src/learning/system-recovery.js','src/ai-advisor.js','src/auto-brain.js','src/learning/knowledge-research.js','src/learning/incident-lifecycle.js','src/learning/incident-playbooks.js','src/learning/advice-outcome.js','src/learning/provider-routing.js','src/learning/autonomous-policy.js','src/learning/proposal-contract.js','src/learning/repair-pipeline.js','src/learning/ai-recovery-fallback.js','src/runtime/recovery-intelligence.js','src/planning/fleet-activity.js'];
+const modules=['src/learning/local-strategic-planner.js','src/learning/system-recovery.js','src/ai-advisor.js','src/auto-brain.js','src/learning/knowledge-research.js','src/learning/incident-lifecycle.js','src/learning/incident-playbooks.js','src/learning/advice-outcome.js','src/learning/provider-routing.js','src/learning/autonomous-policy.js','src/learning/proposal-contract.js','src/learning/repair-pipeline.js','src/learning/ai-recovery-fallback.js','src/runtime/recovery-intelligence.js','src/planning/fleet-activity.js'];
 function dependencies(root){return sha(JSON.stringify(modules.map(p=>{try{return [p,sha(fs.readFileSync(path.join(root,p)))];}catch(e){if(e.code!=='ENOENT')throw e;return [p,null];}})));}
 class AdvisoryReload{
  constructor(root,machine){this.root=root;this.machine=machine;this.loaded=require('../knowledge/system-version').inventory(root).components.ai.revision;this.loadedDependencies=dependencies(root);this.state={status:'loaded',loadedRevision:this.loaded,loadedDependencyRevision:this.loadedDependencies,at:Date.now()};}
@@ -23,7 +23,7 @@ class AdvisoryReload{
    const replacement=factory();
    if(require('../knowledge/system-version').inventory(this.root).components.ai.revision!==revision||dependencies(this.root)!==dependencyRevision)throw Error('source changed during reload');
    replacement.advisor.last=current.advisor.last;replacement.advisor.nextAt=current.advisor.nextAt;
-   replacement.autoBrain.data=current.autoBrain.data;
+   replacement.autoBrain.data=current.autoBrain.data;if(replacement.autoBrain.data.enabled&&replacement.autoBrain.data.failures)replacement.autoBrain.data.nextAt=Math.min(replacement.autoBrain.data.nextAt||0,now);
    current.advisor=replacement.advisor;current.autoBrain=replacement.autoBrain;
    this.loaded=revision;this.loadedDependencies=dependencyRevision;this.state={status:'loaded',loadedRevision:revision,loadedDependencyRevision:dependencyRevision,at:now,farmRestarted:false};
   }catch{for(const [file,module]of cache){if(module)require.cache[file]=module;else delete require.cache[file];}this.state={...this.state,status:'failed',reason:'โหลด AI ไม่สำเร็จ · รักษาสมองเดิมและฟาร์มเดิม',at:now};}

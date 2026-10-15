@@ -5,6 +5,7 @@ class SocialInbox{
  constructor(bossIds=[]){this.bossPositions=new(require('./boss-feed').BossPositions)(bossIds);this.astral=new(require('../observability/astral-state').AstralState)();this.power=new(require('../observability/power-state').PowerState)();this.market=new(require('../observability/market-state').MarketState)();this.buildLab=new(require('../observability/build-lab-state').BuildLabState)();this.clear();}
  // Once bound, absence is evidence too: the new connection has not received a
  // party yet. Falling back to the page could return an old connection's frame.
+ sustainTelemetry(){return {generation:this.generation,self:this.power.combat.view(),combatDomain:this.power.combatDomain,authority:'server_socket_observations_not_causal_support_credit'};}
  owns(type){return this.generation>0&&['party','pinvite','bossboard','as','asno','mk','mkr'].includes(type);}
  bind(socket){
   const generation=this.generation=(this.generation||0)+1;this.clear();

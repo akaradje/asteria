@@ -56,7 +56,8 @@ function closedSession(row,receipt){return Number.isFinite(row?.at)&&Number.isFi
 function rebase(i,entry,receipt,closure,now=Date.now()){
  if(!idle(i,now,true)||!currentMatches(i,receipt)&&!closedSession(entry.row,receipt))return false;
  const row=entry.row,d=descriptor(row);if(!d||d.actorId!==i.actorIdentity.actorId)return false;
- const patch=require('../result-ledger').ResultLedger.rebasePurchase(row,receipt.state,receipt.proof,{...closure,currentActorId:i.actorIdentity.actorId,currentBuild:i.catalog().build,currentSessionStartedAt:i.bagSessionStartedAt,currentGeneration:i.socialInbox?.generation},now);
+ const currentClosure={...closure,currentActorId:i.actorIdentity.actorId,currentBuild:i.catalog().build,currentSessionStartedAt:i.bagSessionStartedAt,currentGeneration:i.socialInbox?.generation};
+ const patch=d.build===receipt.proof?.build?require('../result-ledger').ResultLedger.rebasePurchase(row,receipt.state,receipt.proof,currentClosure,now):require('./closed-purchase-budget').validate(row,receipt.state,receipt.proof,currentClosure,now);
  if(!patch)return false;
  patch.reconciliation.currentClientProjectionMatched=currentMatches(i,receipt);
  patch.reconciliation.closedNativeSession=closedSession(row,receipt);
@@ -81,18 +82,18 @@ function rebase(i,entry,receipt,closure,now=Date.now()){
 }
 async function tick(i){
  const now=Date.now(),view=inspect(i,now);i.purchaseOutcomeRecovery=view;
- if(view.state!=='recoverable'||i.purchaseRecoveryFlight||now-(i.purchaseRecoveryAt||0)<30000)return null;
+ if(view.state!=='recoverable'||i.purchaseRecoveryFlight||now-(i.purchaseRecoveryAt||0)<10000)return null;
  i.purchaseRecoveryAt=now;i.purchaseRecoveryFlight=true;
  const actionContract=require('./action-contract').contract(i,'recycle',{recovery:true});
  try{return await i.v2.scheduler.run('purchase-outcome-recovery',async()=>{
   if(inspect(i,Date.now(),true).state!=='recoverable')return null;
   const closure={kind:'fresh_idle_executor_before_native_probe',at:Date.now(),schedulerIdle:true,noInFlightPayment:true,ownerSession:i.actorOwner.session,ownerGeneration:i.actorOwner.generation};
   let receipt=await require('./native-save-probe').authoritativeReadback(i);
-  if(!receipt||!idle(i,Date.now(),true))return null;
+  if(!receipt||!idle(i,Date.now(),true)){i.purchaseOutcomeRecovery={state:'waiting',reason:'fresh authoritative native probe incomplete',replayBlocked:true};return null;}
   if(!currentMatches(i,receipt)&&!rows(i).filter(e=>Date.now()-e.row.at>=600000).every(e=>closedSession(e.row,receipt))){
    // A probe never overwrites a divergent client. Close only this actor once.
    const entries=rows(i).filter(e=>Date.now()-e.row.at>=600000),dir=path.join(i.root,'logs/purchase-quarantine',i.actorIdentity.actorId),attempts=entries.map(e=>path.join(dir,sha(Buffer.from('recycle|'+e.source+'|'+e.row.id))+'.json'));
-   if(i.purchaseRecycleAttempted||typeof i.recycle!=='function'||attempts.some(f=>fs.existsSync(f)))return null;
+   if(typeof i.recycle!=='function'||attempts.some(f=>fs.existsSync(f)))return null;
    fs.mkdirSync(dir,{recursive:true});for(let n=0;n<attempts.length;n++){const fd=fs.openSync(attempts[n],'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify({version:1,id:entries[n].row.id,actorId:i.actorIdentity.actorId,at:Date.now(),sessionStartedAt:i.bagSessionStartedAt,generation:i.socialInbox.generation,replayBlocked:true,recycleDispatchedOnce:true,closure}));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
    i.purchaseRecycleAttempted=true;i.purchaseOutcomeRecovery={state:'awaiting_native_reconciliation',replayed:false,reason:'current native/client state differs; single actor recycle'};
    actionContract.beginRecovery();
@@ -101,6 +102,6 @@ async function tick(i){
   let count=0;for(const entry of rows(i).filter(c=>Date.now()-c.row.at>=600000))if(rebase(i,entry,receipt,closure))count++;
   i.purchaseOutcomeRecovery={state:count?'RECONCILED':'waiting',at:Date.now(),count,replayBlocked:true,historicalSuccessKnown:false,historicalCostKnown:false,rev:receipt.proof.rev};
   return count?'stale purchase budget rebased; original UUID quarantined without replay':null;
- },{priority:0,leaseMs:30000,contract:actionContract});}catch{i.purchaseOutcomeRecovery={state:'waiting',reason:'native purchase reconciliation incomplete; no replay',replayBlocked:true};return null;}finally{i.purchaseRecoveryFlight=false;}
+ },{priority:0,leaseMs:30000,contract:actionContract});}catch(e){i.purchaseOutcomeRecovery={state:'waiting',reason:'native purchase reconciliation incomplete; no replay',errorCode:e.code||e.name,replayBlocked:true};return null;}finally{i.purchaseRecoveryFlight=false;}
 }
 module.exports={descriptor,rows,idle,inspect,archive,rebase,tick,closedSession};
