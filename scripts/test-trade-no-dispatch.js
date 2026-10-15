@@ -22,6 +22,7 @@ const helpers={persist:i=>{persists++;fs.writeFileSync(i.tradeJournalFile,JSON.s
  // A stale coordinator attempting this exact UUID cannot reach any native dispatch API.
  for(const i of actors){i.teamTradeIntent={id,offer,build:'fixture',phase:'GATHERING',at:now,deadline:now+10000,quarantined:[]};i.socialLast=async()=>null;assert.equal(await runtime.tick(i,{}),null);}
  const saved=JSON.parse(JSON.stringify(q));assert.equal(no.resolve(root,q,members,'vps','fixture',now+60000),false,'Closed evidence does not expire back into UNKNOWN solely from elapsed time');
+ const legacy={id,offer,resolution:'resolved_not_dispatched',resolutionEvidence:'both_durable_actor_journals_no_commands_and_fresh_clear_native_sessions'};assert.equal(no.resolve(root,legacy,members,'vps','fixture'),false);assert.equal(legacy.resolution,'resolved_not_dispatched','Previously verified legacy closures are not reopened for lacking newly introduced certificates');
  // Late contradicting receipt/session evidence reopens quarantine, but UUID stays fenced.
  const i=actors[0],row=JSON.parse(fs.readFileSync(i.tradeJournalFile));fs.writeFileSync(i.tradeJournalFile,JSON.stringify({...row,sessionId:87,sent:{confirm:true},receipt:{id:87}}));assert(no.resolve(root,q,members,'vps','fixture'));assert.equal(q.resolution,'unresolved_no_replay');assert(no.blocked(i,id));fs.writeFileSync(i.tradeJournalFile,JSON.stringify(row));
  // Fresh certificate owner/generation and current clear native availability are required.

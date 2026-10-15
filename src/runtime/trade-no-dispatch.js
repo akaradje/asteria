@@ -33,6 +33,9 @@ function candidate(root,q,members,host){
  try{const names=require('../planning/host-team-scope').team(root,host)?.members.map(m=>m.charName)||[];return q.offer?.donor!==q.offer?.receiver&&[q.offer?.donor,q.offer?.receiver].every(name=>{const m=members.find(m=>m.charName===name&&m.machine===host&&names.includes(name));if(!m||!uuid(q.id))return false;const r=JSON.parse(fs.readFileSync(path.join(root,'logs/trades',sha(name).slice(0,24),q.id+'.json')));return r.id===q.id&&r.context?.actorId===m.identity?.actorId&&JSON.stringify(r.offer)===JSON.stringify(q.offer)&&!!original(root,r);});}catch{return false;}
 }
 function resolve(root,q,members,host,build,now=Date.now()){
+ // Legacy bilateral closures retain their own evidence contract; absence of a
+ // certificate introduced by this release is not contradictory evidence.
+ if(q.resolution==='resolved_not_dispatched'&&!q.noDispatchResolution)return false;
  if(!['unresolved_no_replay','resolved_not_dispatched'].includes(q.resolution)||!uuid(q.id)||!q.offer||q.offer.donor===q.offer.receiver)return false;
  const names=require('../planning/host-team-scope').team(root,host)?.members.map(m=>m.charName)||[],pair=[q.offer.donor,q.offer.receiver].map(n=>members.find(m=>m.charName===n&&m.machine===host&&names.includes(n)));
  if(pair.some(m=>!m))return false;
