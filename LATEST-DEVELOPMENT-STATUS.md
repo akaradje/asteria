@@ -1,3 +1,13 @@
+## Guarded six-actor lifecycle rollout verified — 2026-10-16T04:27:03.303755+07:00 Asia/Bangkok
+
+Source 7ee171c669f981223455806132a0024c7a5b55c652996ea0e0219f941c8ac534 / full 73b99f6ad09e338e21b8c8f524880962cb726614113674e871398eb9c070f35c / native catalog 751aed14. Full offline regression passed 157/157 on Windows and isolated Linux with no source/catalog drift; sanitized public suite passed23/23, guarded-admission fixtures40/40 and11 protected kernels unchanged. Default staged and pre-push secret checks passed.
+
+Loaded through the existing guarded remote controllers on both registered three-actor hosts; host AI validation5/5 each. All six subsequently played with coherent source and identity-bound post-load authoritative readbacks.692 pre-existing immutable originals retained matching SHA-256;1731/1929 operational file hashes unchanged during the final code copy. Both temporary new-activity admission pauses were restored to their original enabled state. Windows was not controlled or restarted; account state, learning and journals were not copied between hosts.
+
+The queued-command correction passed the actual serialized tick regression and a live new strategic command reached applied on nodeA. nodeB produced a fresh continue/observe review with zero advisor failures; no forced paid action was used as a test. Application of strategy is distinct from an upgrade. Native owned Blessing Stone attempts produced exact closed paid server_no_increase receipts; no power increase is claimed for these failed rolls. Historical trade uncertainty stays unknown and blocked from replay while verified idle navigation can resume. A released actor encountered a combat death and selected its safer recovery route; long-term combat improvement and uptime remain unproven.
+
+Code publication:2169eedf0572686829fd5c60049f2ad6cb40cbe3. This entry records verification only and changes no runtime source.
+
 ## Canonical refinement outcomes and bounded strategic lifecycle — 2026-10-16T04:10:08.018945+07:00 Asia/Bangkok
 
 Project refinement results by exact transaction and canonical native receipt; closed failed rolls are paid outcomes, not pending upgrades. Keep queued AI delivery separate from routine review; expire stale commands, request a fresh UUID/evidence review, and preserve active owners. Reconcile stale navigation before optional planning; historical transaction outcomes remain unknown and blocked from replay. Evaluate owned low-risk Blessing Stones with one stone reserved and exact consumable cost. Windows remains untouched. Final frozen regression and native rollout evidence are recorded separately.
