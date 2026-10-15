@@ -9,7 +9,7 @@ class BrainMemory {
     const operational=options.mode==='operational';
     if(operational&&(!Object.hasOwn(require('./character-brain').FOCUSES,action)||proposal?.version!==2||proposal.maxSpend!==0||!proposal.actorId||!proposal.build||!Number.isFinite(proposal.expiresAt)||proposal.expiresAt<=now||proposal.stopRule?.stopOnUncertain!==true||proposal.stopRule?.maxDeaths!==0||!Number.isSafeInteger(proposal.stopRule?.maxActiveMs)||duration>proposal.stopRule.maxActiveMs||!Array.isArray(options.uncertainBaseline)))throw Error('Invalid operational strategy');
     if(proposal){const check=require('./learning/advice-exposure').allow(this.data,action,proposal,now,operational);if(!check.allowed)throw Error(check.reason);}
-    this.data.strategy={action,reason:String(reason||'').slice(0,1200),at:now,until:now+duration,proposal,activeMs:0,lastSampleAt:null,...(operational?{mode:'operational',uncertainBaseline:options.uncertainBaseline}:{} )};
+    this.data.strategy={action,reason:String(reason||'').slice(0,1200),at:now,until:now+duration,proposal,activeMs:0,lastSampleAt:null,...(operational?{mode:'operational',uncertainBaseline:options.uncertainBaseline,uncertainBaselineVersion:require('./learning/strategy-scope').version}:{} )};
     this.data.decisions=[this.data.strategy,...(this.data.decisions||[])].slice(0,12);this.save();
   }
   strategy(now=Date.now()){return this.data.strategy?.until>now?this.data.strategy:null;}
@@ -18,7 +18,7 @@ class BrainMemory {
     const exposure=require('./learning/advice-exposure'),usage=exposure.sample(this.data,now,active,!!(s?.proposal&&s.mode!=='operational'&&s.until>now));if(!s?.proposal||s.until<=now){if(now-(this.exposureSavedAt||0)>=30000){this.exposureSavedAt=now;this.save();}return null;}
     const p=s.proposal,rows=i.v2?.journal?.rows||[],unknown=rows.some(r=>['UNCERTAIN','OBSERVED'].includes(r.status)&&!r.closedSessionEvidence)||['unresolved','spent_without_change'].includes(i.developmentLedger?.pending?.()?.status)||i.teamTradeStatus?.phase==='UNCERTAIN';
     const newUnknown=s.mode==='operational'?require('./learning/strategy-scope').uncertainty(i).some(k=>!(s.uncertainBaseline||[]).includes(k)):unknown;
-    const reason=i.actorIdentity?.actorId!==p.actorId?'actor_changed':i.catalog?.().build!==p.build?'build_changed':i.livePos?.dead?'death':newUnknown?'uncertain_paid':i.bossWindow?.departAt&&now>=i.bossWindow.departAt?'personal_return_deadline':s.mode!=='operational'&&usage.exploration>=usage.active*.1?'rolling_exploration_budget':null;
+    const reason=i.actorIdentity?.actorId!==p.actorId?'actor_changed':i.catalog?.().build!==p.build?'build_changed':i.livePos?.dead?'death':s.mode==='operational'&&s.uncertainBaselineVersion!==require('./learning/strategy-scope').version?'strategy_scope_updated':newUnknown?'uncertain_paid':i.bossWindow?.departAt&&now>=i.bossWindow.departAt?'personal_return_deadline':s.mode!=='operational'&&usage.exploration>=usage.active*.1?'rolling_exploration_budget':null;
     if(reason){s.until=now;s.stopReason=reason;s.stoppedAt=now;exposure.failed(this.data,s.action,p,reason,now);this.save();return reason;}
     if(active&&s.lastSampleAt!==null&&now>=s.lastSampleAt&&now-s.lastSampleAt<=10000)s.activeMs+=now-s.lastSampleAt;
     s.lastSampleAt=active?now:null;

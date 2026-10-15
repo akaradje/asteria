@@ -954,7 +954,7 @@ towerQuit() { return this.socialSend('twquit'); }
       // Re-read each time: the panel re-renders after every attempt (level, cost and ore all
       // change), so a handle captured up front goes stale exactly like the sell and donate lists.
       const trackedRefine=this.developmentLedger?.rows?.find(r=>r.id===this.activeDevelopmentAttempt?.id);
-      if(!require('./runtime/fresh-refine-attempt').dispatch(this,trackedRefine,current))throw Error('Fresh native refinement intent expired before payment');
+      if(!await require('./runtime/fresh-refine-attempt').prepare(this,trackedRefine,current))throw Object.assign(Error('Fresh native refinement preparation changed before payment; replan with a new UUID'),{code:'ASTERIA_REFINE_PREPARATION_CHANGED'});
       if(this.activeDevelopmentAttempt?.kind==='refine'&&!this.developmentLedger.markRefineDispatch(this.activeDevelopmentAttempt.id,current))throw Error('Refine dispatch ledger boundary changed');
       const contract=current.destructive?require('./knowledge/development-source').source(this.root,this.catalog().build,this.catalog(),'refine').contract.facts:null;
       if(current.destructive&&(!current.spare||current.valuation?.eligible!==true||!contract?.twoTap||!contract.confirmation))throw Error('Native destructive risk/spare/confirmation contract changed');
@@ -2969,6 +2969,14 @@ towerQuit() { return this.socialSend('twquit'); }
           next = 0;                                 // tick at once on the fresh context
           continue;
         }
+        const pause=require('./runtime/connection-continuity').pause(this,e);
+        if(pause){
+          this.continuityReason=pause.category;
+          if(onStatus)onStatus(this,'awaiting fresh native context: '+pause.category);
+          next=pause.retryAt;
+          await sleep(Math.max(1000,Math.min(8000,pause.retryAt-Date.now())));
+          continue;
+        }
         this.log('controller error: ' + e.message, 'error');
         throw e;
       }
@@ -3112,6 +3120,7 @@ towerQuit() { return this.socialSend('twquit'); }
       automationSettings: this.automationSettings || null,
       enchantStatus: this.enchantStatus || null,
       lastRecycleAt: this.lastRecycleAt || null,
+      connectionContinuity: this.connectionContinuity || null,
       upMin: this.startedAt ? +((Date.now() - this.startedAt) / 60000).toFixed(1) : 0,
       // What the game brain decided and what it has learned (for the dashboard).
       goal: this.goal ? { kind: this.goal.kind, mapId: this.goal.mapId, mapName: this.goal.mapName,monsterId:this.goal.monsterId,monsterKind:this.goal.monsterKind,nightTraining:!!this.goal.nightTraining,
@@ -3200,7 +3209,7 @@ for(const [method,kind] of Object.entries({craftAtExchange:'craft',refineEquippe
       if(ledger.pending(kind))for(let n=0;n<10&&ledger.pending(kind);n++){await sleep(500);ledger.observe(this.lastSave,this.lastSaveAt);}
       this.onBrainReport?.('ผลอุปกรณ์ '+kind+': '+attempt.status+' · หลักฐาน '+attempt.evidence);
       return result;
-    }catch(e){ledger.cancelBeforeCraftDispatch(attempt.id,'Craft failed before the native payment evaluation');ledger.cancelBeforeRefineDispatch(attempt.id,'Refinement failed before the native payment evaluation');ledger.seal(attempt.id);this.onBrainReport?.('ผลอุปกรณ์ '+attempt.status+' · ไม่ส่งรายการผลไม่ชัดซ้ำ');throw e;}finally{this.activeDevelopmentAttempt=previousAttempt;}
+    }catch(e){ledger.cancelBeforeCraftDispatch(attempt.id,'Craft failed before the native payment evaluation');const unsent=ledger.cancelBeforeRefineDispatch(attempt.id,'Refinement failed before the native payment evaluation');ledger.seal(attempt.id);this.onBrainReport?.('ผลอุปกรณ์ '+attempt.status+' · ไม่ส่งรายการผลไม่ชัดซ้ำ');if(e.code==='ASTERIA_REFINE_PREPARATION_CHANGED'&&kind==='refine'&&unsent)return {ok:false,refined:0,attempted:0,reservationNotSent:true,reason:'fresh_refine_preparation_changed',transactionId:attempt.id};throw e;}finally{this.activeDevelopmentAttempt=previousAttempt;}
   };
   GameInstance.prototype[method].paidDispatchTracked=true;
 }
