@@ -29,3 +29,22 @@ async function requestNativeResave(instance,{timeoutMs=5000}={}){
  const result=await bounded(pending,timeoutMs);return {at:Date.now(),requested:result?.requested===true,flushed:result?.flushed===true,evidence:'native_saver_requested_not_save_observed'};
 }
 module.exports={probeNativeResave,requestNativeResave};
+
+// Read via the authenticated native API; do not resave a possibly stale body.
+async function authoritativeReadback(instance,{timeoutMs=5000}={}){
+ if(instance.nativeReadbackFlight||instance.nativeFreshSaveFlight)return null;
+ const page=instance.page,actor=instance.actorIdentity?.actorId,session=instance.bagSessionStartedAt,generation=instance.socialInbox?.generation,at=Date.now();
+ const pending=(async()=>{
+  const requested=await instance.eval(`(async()=>{const n=window.AsteriaNet;if(!n?.online||!n.isConnected?.()||n.fixed||n.kicked||n.pause||n.block||!n.account?.charId||typeof n.api!=='function'||typeof n.flush!=='function')return false;await n.flush();await n.api('/api/save');return true;})()`);
+  if(!requested)return null;
+  const until=Date.now()+2000;while(Date.now()<until){
+   if(instance.page!==page||instance.actorIdentity?.actorId!==actor||instance.bagSessionStartedAt!==session||instance.socialInbox?.generation!==generation)return null;
+   const r=instance.serverSaveReceipt,p=r?.proof;
+   if(p?.authority==='server_readback'&&p.actorId===actor&&p.sessionStartedAt===session&&p.generation===generation&&p.requestAt>=at&&p.at>=p.requestAt)return r;
+   await new Promise(resolve=>setTimeout(resolve,40));
+  }return null;
+ })();
+ instance.nativeReadbackFlight=pending;Promise.resolve(pending).finally(()=>{if(instance.nativeReadbackFlight===pending)instance.nativeReadbackFlight=null;}).catch(()=>{});
+ return bounded(pending,timeoutMs);
+}
+module.exports.authoritativeReadback=authoritativeReadback;

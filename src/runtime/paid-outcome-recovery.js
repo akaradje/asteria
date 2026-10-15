@@ -46,6 +46,7 @@ async function readback(i,now=Date.now()){
  }catch{return false;}finally{i.paidReadbackFlight=false;}
 }
 async function tick(i){
+ const purchase=await require('./purchase-rebase').tick(i);if(purchase)return purchase;
  if(await readback(i))return 'closed paid native budget rebased; original outcome unknown and never replayed';
  const view=inspect(i);i.paidOutcomeRecovery=view;
  if(view.state!=='recoverable'||typeof i.recycle!=='function')return null;

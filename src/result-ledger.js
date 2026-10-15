@@ -155,3 +155,13 @@ class ResultLedger{
  view(){return this.rows.slice(0,20);}
 }
 module.exports={ResultLedger,snapshot};
+
+// Explicit user authorization 2026-10-15: append-only purchase budget rebase.
+// Existing ResultLedger payment/receipt functions above remain unchanged.
+ResultLedger.rebasePurchase=function(row,state,proof,closure,now=Date.now()){
+ const d=require('./runtime/purchase-rebase').descriptor(row);
+ if(!d||now-row.at<600000||proof?.authority!=='server_readback'||proof.actorId!==d.actorId||proof.actorId!==closure?.currentActorId||proof.build!==closure.currentBuild||proof.build!==d.build||proof.sessionStartedAt!==closure.currentSessionStartedAt||proof.generation!==closure.currentGeneration||!Number.isSafeInteger(proof.generation)||!Number.isSafeInteger(proof.rev)||proof.rev<=d.baselineRev||!Number.isFinite(proof.requestAt)||!Number.isFinite(proof.at)||proof.requestAt<proof.sessionStartedAt||proof.at<proof.requestAt||now<proof.at||now-proof.at>=30000||proof.at-proof.requestAt>=30000)return null;
+ if(closure.kind!=='fresh_idle_executor_before_native_probe'||closure.schedulerIdle!==true||closure.noInFlightPayment!==true||!closure.ownerSession||!Number.isSafeInteger(closure.ownerGeneration)||!Number.isFinite(closure.at)||closure.at>proof.requestAt||proof.requestAt-closure.at>=30000||proof.sessionStartedAt<d.sessionStartedAt||proof.sessionStartedAt===d.sessionStartedAt&&proof.generation<d.generation)return null;
+ if(!state||!Number.isSafeInteger(state.coins)||state.coins<0||['tokens','runeDust','leaves'].some(k=>state[k]!==undefined&&(!Number.isSafeInteger(state[k])||state[k]<0))||['materials','consumables','keyItems'].some(k=>!state[k]||typeof state[k]!=='object'||Array.isArray(state[k])||Object.values(state[k]).some(n=>!Number.isSafeInteger(n)||n<0))||!Array.isArray(state.bag)||!state.equip||typeof state.equip!=='object'||Array.isArray(state.equip))return null;
+ return {status:'RECONCILED',evidence:'native_current_budget_after_idle_purchase_executor',originalOutcome:{status:row.status,evidence:row.evidence??null,reason:row.reason??null},replayBlocked:true,reconciliation:{...proof,budgetRebased:true,currentStateOnly:true,currentWallet:{Copper:state.coins,'Guild Token':state.tokens||0,'Rune Dust':state.runeDust||0,'Boar Leaf':state.leaves||0},currentInventorySha256:crypto.createHash('sha256').update(JSON.stringify(snapshot(state))).digest('hex'),costKnown:false,historicalSuccessKnown:false,replayBlocked:true,executorClosure:{...closure}}};
+};
