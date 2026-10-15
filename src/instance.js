@@ -2090,7 +2090,7 @@ towerQuit() { return this.socialSend('twquit'); }
       return 'recovered';
     }
     this.status = 'playing';
-    await require('./registry/worker').settled(this);
+    await require('./runtime/connection-continuity').settled(this);
     require('./observability/server-rankings').refreshRankings(this).catch(()=>{});
     if(s.panelOpen&&s.panelName==='news'&&await require('./runtime/startup-news').dismissStartupNews(this)){
       s.panelOpen=false;s.panelName=null;

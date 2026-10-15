@@ -1,3 +1,7 @@
+## Refinement preparation, strategic uncertainty and bounded session continuity — 2026-10-16T06:30:07.607360+07:00 Asia/Bangkok
+
+Renew an exact preparing refinement intent through one identity-bound native readback only when the original typed budget is unchanged. A rejected preparation is NOT_SENT and replans with a new UUID; possible payments remain unknown and cannot replay. Strategic uncertainty keys ignore heartbeat timestamps while real confirmation/new ambiguity still stops the plan. Bound transient context/generation/read waits after unwinding; never retry a method or weaken owner, source, frozen-page or payment contracts. Windows remains untouched. Final frozen regression and native rollout evidence are recorded separately.
+
 ## Refinement preparation, strategic uncertainty and bounded session continuity — 2026-10-16T06:09:17.159175+07:00 Asia/Bangkok
 
 Renew an exact preparing refinement intent through one identity-bound native readback only when the original typed budget is unchanged. A rejected preparation is NOT_SENT and replans with a new UUID; possible payments remain unknown and cannot replay. Strategic uncertainty keys ignore heartbeat timestamps while real confirmation/new ambiguity still stops the plan. Bound transient context/generation/read waits after unwinding; never retry a method or weaken owner, source, frozen-page or payment contracts. Windows remains untouched. Final frozen regression and native rollout evidence are recorded separately.
