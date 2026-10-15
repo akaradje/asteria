@@ -2110,6 +2110,7 @@ towerQuit() { return this.socialSend('twquit'); }
     this.outcomes?.observe({saveAt:this.lastSaveAt,mp:this.lastSave?.mp,consumables:this.lastSave?.consumables,pos:this.livePos,peers:this.teamPeers?.().map(i=>({slot:i.slot,hp:i.vitals?.hp,at:i.vitals?.at,room:i.livePos?.room}))});
     // Observe arrival/expired navigation before an owner can starve this branch.
     // The helper still refuses active native trade, team and payment work.
+    await require('./runtime/idle-trade-navigation').refresh(this);
     require('./runtime/work-continuity').reconcileTravel(this);
     // AI commands are consumed inside this tick, never concurrently with game actions.
     if (this.aiPending && !s.panelOpen) {
