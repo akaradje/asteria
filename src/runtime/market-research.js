@@ -14,6 +14,7 @@ async function tick(i,s,now=Date.now()){
   const board=i.socialInbox?.market?.board;
   if(board&&board.generation===state.generation&&board.at>=state.requestedAt){i.marketResearchStatus={...state,state:'observed',receivedAt:board.at,visibleListings:board.list.length,total:board.total,queryComplete:board.queryComplete,parametersKnown:[board.tax,board.fee,board.max].every(x=>x!==null),mode:'read_only'};}
   else if(now-state.requestedAt>=15000||state.generation!==i.socialInbox?.generation)i.marketResearchStatus={...state,state:'response_unverified',mode:'read_only'};
+  if(i.marketResearchStatus?.state==='observed')require('../planning/market-shadow').observe(i,now);
   return;
  }
  if(!eligible(i,s,now)||state&&now<state.nextAt)return;

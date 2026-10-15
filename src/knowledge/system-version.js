@@ -7,7 +7,7 @@ function inventory(root){
  function walk(dir){if(!fs.existsSync(path.join(root,dir)))return;for(const e of fs.readdirSync(path.join(root,dir),{withFileTypes:true})){const p=dir+'/'+e.name;if(e.isDirectory())walk(p);else if(/\.(js|html|css)$/.test(e.name))files.push(p);}}
  walk('src');
  if(fs.existsSync(path.join(root,'machines/runtime-v32.json')))files.push('machines/runtime-v32.json');
- for(const p of ['scripts/registry-authority.js','scripts/registry-host-agent.js','scripts/registry-bridge.py','scripts/v32-checks.js','scripts/v32-soak.js','scripts/build-expansion-release.js'])if(fs.existsSync(path.join(root,p)))files.push(p);
+ for(const p of ['scripts/registry-authority.js','scripts/registry-host-agent.js','scripts/registry-bridge.py','scripts/v32-checks.js','scripts/public-safety-check.js','scripts/v32-soak.js','scripts/build-expansion-release.js'])if(fs.existsSync(path.join(root,p)))files.push(p);
  for(const p of ['scripts/review-game-release.js','scripts/repair-worker.js','package.json','package-lock.json','scripts/run.js','scripts/control-fleet.js','scripts/build-architecture-release.js','scripts/test-version-release.js','scripts/fleet-exchange.py','scripts/fleet-panel-bridge.py','scripts/vps-panel-bridge.py','scripts/create-expansion-team.js','machines/windows/config.json','machines/tum/config.json','machines/vps/config.json','machines/expansion.json','machines/topology-v32.json','machines/host-teams.json','machines/equipment-goal.json','machines/daily-team-activities.json'])if(fs.existsSync(path.join(root,p)))files.push(p);
  const hashes=Object.fromEntries(files.sort().map(p=>[p,sha(fs.readFileSync(path.join(root,p)))]));
  // Unknown/new files stay in the farm boundary. Advisory command guards are

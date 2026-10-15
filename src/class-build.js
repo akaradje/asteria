@@ -18,4 +18,5 @@ function statPlan(i,job,points,{ignoreNovice=true}={}){
  const plan=[];while(rows.some(r=>r.n>0))for(const r of rows)if(r.n>0){plan.push(r.k);r.n--;}return plan;
  }catch{return [];}
 }
-module.exports={load,skillPlan,statPlan};
+function theorycraft(i){const cat=i.catalog(),job=i.lastSave?.job;let native;try{native=load(i)[job];}catch{}return {build:cat.build,job,role:require('./learning/combat-evidence').role(job,cat.world),nativeStatPrior:native?.bonus||null,learnableSkills:native?.skills||[],combat:i.theorycraft?.combat||null,trial:i.v2?.trial?.combatReview(i)||null,resetPermission:false,limits:'Native bonuses are priors; resets/skill reallocations require verified isolated native trial and exact paid contracts'};}
+module.exports={load,skillPlan,statPlan,theorycraft};

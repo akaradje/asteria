@@ -4,7 +4,7 @@ function inventory(s,cat){const available={...s.materials,...s.keyItems,...s.con
 function estimate(i,name,args){
  const cat=i.catalog(),s=i.lastSave,wiki=economy.withNativeRecipes(economy.loadWiki(i.root),cat);
  if(name==='craftAtExchange'){const r=wiki?.crafting?.recipes?.find(r=>r.result===args[0]);return r?{targetId:require('./craft-scope').target(i,args[0]),cost:Object.fromEntries(Object.entries(r.cost).map(([key,value])=>[key==='tokens'?'Guild Token':key==='runeDust'?'Rune Dust':key==='coins'?'Copper':key,value])),args}:null;}
- if(name==='enchantWeapon'){const p=require('../enchant-plan').plan(s,cat.items,cat.world,wiki);return p.ready?{cost:{Copper:p.cost.coins,'Rune Dust':p.cost.dust,'Guild Token':p.cost.tokens,...(p.rune?{'Ancient Rune':1}:{})},args}:null;}
+ if(name==='enchantWeapon'){if(i.registryV32)return null;const p=require('../enchant-plan').plan(s,cat.items,cat.world,wiki);return p.ready?{cost:{Copper:p.cost.coins,'Rune Dust':p.cost.dust,'Guild Token':p.cost.tokens,...(p.rune?{'Ancient Rune':1}:{})},args}:null;}
  if(name==='refineEquipped'){
   const options=args[0]||{},protectedMaterials=options.reservedMaterials||{},extra=options.extraReserveCoins??0;
   if(!Number.isFinite(extra)||extra<0||typeof protectedMaterials!=='object'||Object.values(protectedMaterials).some(n=>!Number.isFinite(n)||n<0))return null;

@@ -446,7 +446,7 @@ class GameInstance {
     const socialInbox = this.socialInbox = new (require('./runtime/social-inbox').SocialInbox)((this.catalog().world?.MONSTERS||[]).filter(m=>['boss','miniboss'].includes(m.kind)).map(m=>m.id));
     this.page.on('websocket', ws => {
       if (!/\/ws/.test(ws.url())) return;
-      const combatObserver=new(require('./runtime/combat-observer').CombatObserver)(this.reports,this.slot,()=>this.character?.name||this.credentials?.charName,{lab:()=>this.socialInbox?.buildLab?.session?.active===true||require('./runtime/room-policy').roomPolicy(require('./runtime/room-policy').currentRoom(this)).lab===true});
+      const combatObserver=new(require('./runtime/combat-observer').CombatObserver)(this.reports,this.slot,()=>this.character?.name||this.credentials?.charName,{instance:()=>this,lab:()=>this.socialInbox?.buildLab?.session?.active===true||require('./runtime/room-policy').roomPolicy(require('./runtime/room-policy').currentRoom(this)).lab===true});
       socialInbox.bind(ws);
       const generation=socialInbox.generation;
       this.activityEvidence ||=new(require('./observability/activity-evidence').ActivityEvidence)(this.actorStateRoot||this.root,this.actorIdentity?.actorId||this.credentials?.username||'slot-'+this.slot);
@@ -2149,6 +2149,8 @@ towerQuit() { return this.socialSend('twquit'); }
     const townRepair=await require('./runtime/town-position-recovery').tick(this,s);if(townRepair)return townRepair;
     const priorityClass=await require('./runtime/promotion-priority').tick(this,s);if(priorityClass)return priorityClass;
     await require('./runtime/market-research').tick(this,s);
+    const sale=await require('./runtime/market-sell').tick(this);if(sale)return 'bounded market: '+sale.status;
+    const optionTrial=await require('./runtime/option-trials').tick(this);if(optionTrial)return 'bounded option trial: '+optionTrial.status;
     // Inventory maintenance and mana/town visits also precede the ordinary
     // campaign tick. Reserve here so a helper cannot start them mid-rendezvous.
     if(!s.death&&!this.teamControl&&!this.dailyTeamPending&&!this.dailyWorkStatus?.ownsNavigation&&!this.recycling&&!this.choresBusy&&!this.v2?.trial?.active()){
@@ -3043,7 +3045,7 @@ towerQuit() { return this.socialSend('twquit'); }
     }
     return {
       slot: this.slot,
-      researchPoll:this.researchPollStatus||null,buildLab:this.socialInbox?.buildLab?.view()||null,marketObservation:this.socialInbox?.market?.view()||null,marketResearch:this.marketResearchStatus||null,marketShadow:this.marketShadow?{...this.marketShadow,fresh:Number.isFinite(this.marketShadow.boardAt)&&Date.now()-this.marketShadow.boardAt>=0&&Date.now()-this.marketShadow.boardAt<=30000}:null,
+      researchPoll:this.researchPollStatus||null,buildLab:this.socialInbox?.buildLab?.view()||null,marketObservation:this.socialInbox?.market?.view()||null,marketResearch:this.marketResearchStatus||null,marketSell:this.marketSellStatus||null,optionTrial:this.optionTrialStatus||null,marketShadow:this.marketShadow?{...this.marketShadow,fresh:Number.isFinite(this.marketShadow.boardAt)&&Date.now()-this.marketShadow.boardAt>=0&&Date.now()-this.marketShadow.boardAt<=30000}:null,
       astral:this.socialInbox?.astral?.view()||null,astralObjective:this.astralObjective||null,astralQueryStatus:this.astralQueryStatus||null,
       observations:{clientSave:this.clientSaveObservation||null,serverReadback:this.serverSaveObservation||null,power:this.socialInbox?.power?.view()||null},
       identity:this.registryV32?.public(this.actorIdentity)||null,

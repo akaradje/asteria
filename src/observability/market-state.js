@@ -27,7 +27,7 @@ class MarketState{
   if(!Number.isFinite(at)||at<0)return false;
   if(this.inFlight)this.commandConflict=true;
   // Retain neither arbitrary outbound fields nor account data.
-  this.inFlight={sequence:++this.commandSequence,at,op:m.t,lid:integer(m.lid)};return true;
+  this.inFlight={sequence:++this.commandSequence,at,op:m.t,lid:integer(m.lid),...(m.t==='mlist'?{kind:text(m.kind),item:text(m.name)||text(m.id),n:integer(m.n),price:integer(m.price),each:integer(m.each)}:{})};return true;
  }
  receive(m,at=Date.now()){
   if(!['mk','mh','mkr','mksold'].includes(m?.t))return false;

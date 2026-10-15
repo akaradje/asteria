@@ -83,9 +83,12 @@ function publishCollection(root,{build,at,collected,fingerprints,notices,compati
    const unknowns=[];
    const atlas=require('./mechanic-atlas').compile({client:collected[0].value,world:collected[1].value,network:collected[2].value,build});
    for(const row of atlas.rows){
-    facts.push({id:row.id,domain:'atlas:'+row.domain,level:'DISCOVERED',value:row,evidence:[...new Set(row.references.map(r=>r.source))].length?[...new Set(row.references.map(r=>r.source))]:['client','world','network']});
+    facts.push({id:row.id,domain:'atlas:'+row.domain,level:row.level==='PARSED'?'PARSED':'DISCOVERED',value:row,evidence:[...new Set([...row.references.map(r=>r.source),...row.rules.map(r=>r.source)])].length?[...new Set([...row.references.map(r=>r.source),...row.rules.map(r=>r.source)])]:['client','world','network']});
     unknowns.push({id:'atlas-review:'+row.domain,domain:row.domain,reason:'Native action contracts and role benefit require evidence'});
    }
+   for(const rule of atlas.dna.rules)facts.push({id:rule.id,domain:'formula:'+rule.domain,level:'PARSED',value:rule,evidence:[rule.source]});
+   facts.push({id:'dna:constants',domain:'formula:constants',level:'PARSED',value:atlas.dna.numeric,evidence:['client','world']});
+   for(const u of atlas.dna.unknowns)unknowns.push({id:'dna-review:'+u.source+':'+(u.name||u.reason),domain:'formula',reason:u.reason});
 
    for(const n of notices?.notes||[]){facts.push({id:'notice:'+n.id,domain:'announcements',level:'PARSED',value:{content:n.content,visibility:n.visibility,availability:n.availability},evidence:['client']});if(n.visibility==='runtime_gate_unknown')unknowns.push({id:'visibility:'+n.id,domain:'announcements',reason:'Native visibility gate not verified'});}
    if(!notices?.coverage?.complete)unknowns.push({id:'notices:coverage',domain:'announcements',reason:'Notice parse incomplete or unavailable'});

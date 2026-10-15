@@ -7,7 +7,7 @@ function configure(cat,p){cat.equipmentGoal=p;contexts.set(cat.items,p);return c
 // Legacy helpers carry {items,world} rather than the full catalog. Keep their
 // policy context without putting a non-item entry in the native item dictionary.
 function policy(cat){return cat?.equipmentGoal||contexts.get(cat?.items)||{enabled:false};}
-function priority(comparison){return (comparison?.goalPromotion?10000:0)+Math.max(0,comparison?.gain||0);}
+function priority(comparison){return (comparison?.empiricalPolicy?.automatic?100000:0)+(comparison?.goalPromotion?10000:0)+Math.max(0,comparison?.gain||0);}
 function assess(save,cat){
  const p=policy(cat);if(!p.enabled)return null;
  const rows=slots.map(slot=>{const id=save.equip?.[slot],it=cat.items[id],duplicate=id&&Object.entries(save.equip||{}).some(([k,v])=>k!==slot&&v===id),capability=require('./knowledge/refine-capability').support(slot,cat.world),refineSupported=capability.state==='supported',nativeMax=capability.max;

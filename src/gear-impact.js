@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('fs'),path=require('path');
-const signature=s=>JSON.stringify([s.equip,s.refine,s.weaponOpts,s.sockets,s.stage||{}]);
+const signature=s=>require('./learning/combat-evidence').loadout(s);
 class GearImpact{
  constructor(root,slot){this.file=path.join(root,'logs',`gear-impact-${slot}.json`);try{this.data=JSON.parse(fs.readFileSync(this.file));}catch{this.data={groups:[]};}this.prev=null;}
  position(pos){if(pos.dead&&!this.wasDead){const g=this.data.groups.find(g=>g.sig===this.data.currentSig&&g.room===pos.room&&g.lv===this.data.currentLv&&g.build===this.data.currentBuild);if(g)g.deaths++;}this.wasDead=!!pos.dead;}

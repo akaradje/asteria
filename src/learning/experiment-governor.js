@@ -21,6 +21,8 @@ class ExperimentGovernor{
   if(this.active())this.finish('inconclusive','process restarted; restore baseline and retain interrupted evidence');
  }
  active(){return this.data.rows.find(r=>r.status==='running');}
+ acquirePaid(i,id){if(!['tum','vps'].includes(i.machine)||!i.root||!id)return false;const file=path.join(i.root,'logs/option-trials',i.machine+'.lease.json');fs.mkdirSync(path.dirname(file),{recursive:true});try{const fd=fs.openSync(file,'wx');try{fs.writeFileSync(fd,JSON.stringify({id,actorId:i.actorIdentity.actorId,host:i.machine,at:Date.now(),purpose:'single_paid_attempt_then_comparable_combat',replayBlocked:true}));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}return true;}catch{return false;}}
+ releasePaid(i,row){if(row?.status!=='CONFIRMED'||row?.trialState!=='MEASURED_GAIN'||!['tum','vps'].includes(i.machine))return false;const file=path.join(i.root,'logs/option-trials',i.machine+'.lease.json');try{const old=JSON.parse(fs.readFileSync(file));if(old.id!==row.id||old.actorId!==i.actorIdentity.actorId)return false;fs.unlinkSync(file);return true;}catch{return false;}}
  persist(){if(!this.file)return;fs.mkdirSync(path.dirname(this.file),{recursive:true});fs.writeFileSync(this.file+'.tmp',JSON.stringify(this.data));fs.renameSync(this.file+'.tmp',this.file);}
  release(){if(!this.lock)return;try{const r=JSON.parse(fs.readFileSync(this.lock));if(r.owner===this.owner||r.file===this.file)fs.unlinkSync(this.lock);}catch{}}
  acquire(deadline,bootstrap,now){
@@ -85,6 +87,7 @@ class ExperimentGovernor{
   // Keep the last bootstrap timestamp after the lease is released.
   if(this.lock)try{const l=JSON.parse(fs.readFileSync(this.lock));if(l.owner===this.owner||l.file===this.file){l.deadline=0;fs.writeFileSync(this.lock,JSON.stringify(l));}}catch{}
  }
+ combatReview(i,now=this.now()){const p=require('../planning/theorycraft').plan(i,now);return {...p,paidOptions:require('../runtime/option-trials').review(i),explorationBudgetMs:Math.max(0,this.data.observedMs*.05-this.data.explorationMs),leaseHeld:!!this.active(),dispatchAllowed:false};}
  view(){return {version:3,policyEvidence:this.data.policyEvidence||null,owner:'single_route_governor',active:this.active()||null,rows:this.data.rows.slice(0,4),observedMs:this.data.observedMs,explorationMs:this.data.explorationMs,maxExplorationFraction:.05,bootstrapAllowanceMs:900000,limits:'A/B/A nonrandomized native-save evidence; no global optimality or causal proof'};}
 }
 module.exports={ExperimentGovernor,measurable,routePaymentBlocks,controlSafe};

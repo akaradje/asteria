@@ -1,0 +1,10 @@
+'use strict';
+// Candidates are plans. Paid rerolls/resets never become trial permissions.
+function plan(i,now=Date.now()){
+ const cat=i.catalog(),save=i.lastSave||{},e=i.combatEvidence?.view(i,now),policies=[];
+ if(e?.scope)for(const loadoutSignature of [...new Set(e.windows.map(w=>w.loadoutSignature))]){const sample=e.windows.find(w=>w.loadoutSignature===loadoutSignature);const p=require('../learning/policy-evidence').assessCombat(e.windows,{...e.scope,loadoutSignature},{now});if(p.automatic)policies.push({...p,equip:sample.equip,petActive:sample.petActive});}
+ const proposals=[{kind:'activity-loadout',budgetCopper:0,requires:'owned_native_equipment_adapter_and_fresh_save',automaticPermission:false},{kind:'active-pet',budgetCopper:0,requires:'owned_native_pet_toggle_and_fresh_save',automaticPermission:false},...['stats','skills','enchant','pet-options'].map(kind=>({kind,budgetCopper:0,requires:'verified_native_lab_isolation_or_separately_budgeted_transaction_contract',automaticPermission:false,reason:'No reset or reroll is dispatched to discover a mechanic'}))];
+ return {version:1,at:now,build:cat.build,actorId:i.actorIdentity?.actorId||null,role:require('../learning/combat-evidence').role(save.job,cat.world),combat:e?.current||null,policies,proposals,mode:'bounded_theorycraft_native_execution_separate',unresolved:e?.scope?.role==='support'?['outgoing heal/buff uptime attribution','complete-party death-free completion denominator']:[],measuredOptimal:false};
+}
+function preference(save,cat,equip=save.equip,petActive=save.petActive){const state=save.empiricalCombatPreferences;if(!state||state.build!==cat.build||state.job!==save.job||!Number.isFinite(state.at)||Date.now()<state.at||Date.now()-state.at>30000)return null;const signature=require('../learning/combat-evidence').loadout({...save,equip,petActive});return state.policies?.find(p=>p.automatic&&p.state==='PROMOTED'&&p.scope.actorId===state.actorId&&p.scope.loadoutSignature===signature)||null;}
+module.exports={plan,preference};

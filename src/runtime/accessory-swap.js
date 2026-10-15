@@ -18,6 +18,7 @@ const catName=(i,id)=>i.catalog().items[id]?.name;
 // Native keyFor selects acc1 when both slots are occupied. Make the requested
 // slot the only empty one, keep the other item, and verify each save boundary.
 async function replace(i,want){
+ const empiricalBefore=i.combatEvidence?.view(i)?.current||null;
  const s=i.lastSave,cat=i.catalog(),comparison=gear.compare(s,cat,want.id),slot=comparison.slot;
  if(!comparison.upgrade||!['acc1','acc2'].includes(slot)||slot!==want.slot)return {equipped:0,reason:'accessory-plan-changed'};
  const other=slot==='acc1'?'acc2':'acc1',old=s.equip[slot],retained=s.equip[other];
@@ -31,7 +32,7 @@ async function replace(i,want){
  if(!detached)return {equipped:0,reason:'accessory-not-detached'};
  if(!await wait(i,x=>!x.equip?.[slot]&&x.equip?.[other]===retained&&x.bag?.some(b=>(typeof b==='string'?b:b.id)===old),at))return {equipped:0,reason:'accessory-detach-outcome-unknown'};
  const sentAt=Date.now(),sent=await wear(i,want.id,slot,retained);
- if(sent&&await wait(i,x=>x.equip?.[slot]===want.id&&x.equip?.[other]===retained,sentAt))return {equipped:1,slot,id:want.id,evidence:'outgoing_client_save'};
+ if(sent&&await wait(i,x=>x.equip?.[slot]===want.id&&x.equip?.[other]===retained,sentAt))return {equipped:1,slot,id:want.id,combatBaseline:empiricalBefore?{id:empiricalBefore.id,loadoutSignature:empiricalBefore.loadoutSignature,dps:empiricalBefore.dps,killsPerHour:empiricalBefore.killsPerHour,deaths:empiricalBefore.deaths}:null,benefitMeasured:false,evidence:'outgoing_client_save'};
  // Restore only a proven empty slot. An unknown/non-empty state is left for
  // fresh reconciliation, never overwritten or reported as an upgrade.
  if(!i.lastSave.equip[slot]&&i.lastSave.equip[other]===retained&&Date.now()-i.lastSaveAt<30000){const restoreAt=Date.now(),restored=await wear(i,old,slot,retained);if(restored&&await wait(i,x=>x.equip?.[slot]===old&&x.equip?.[other]===retained,restoreAt))return {equipped:0,reason:'accessory-restored-after-failed-swap'};}

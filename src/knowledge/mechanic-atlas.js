@@ -27,11 +27,13 @@ const domains=[
  ['runtime',['BAG_PRICES','STORE_PRICES'],['capacity','recovery']]
 ];
 function compile({client='',world='',network='',build}={}){
+ const dna=require('./game-dna').extract({client,world,build});
  const sources={client,world,network},rows=domains.map(([domain,symbols,actions])=>{
   const references=[];
   for(const symbol of symbols){const expression=new RegExp('\\b'+symbol+'\\b','g');for(const [source,text]of Object.entries(sources)){const m=expression.exec(text);expression.lastIndex=0;if(m)references.push({symbol,source,offset:m.index});}}
-  return {id:'atlas:'+domain,domain,build,level:references.length?'DISCOVERED':'UNKNOWN',references,capabilities:actions.map(action=>({id:domain+'.'+action,state:'NATIVE_CONTRACT_NOT_VERIFIED',executable:false})),unresolved:['native eligibility','resource/fee model','receipt semantics','role benefit'],runtimeVerified:false};
+  const rules=dna.rules.filter(r=>r.domain===domain);
+  return {id:'atlas:'+domain,domain,build,level:rules.length?'PARSED':references.length?'DISCOVERED':'UNKNOWN',references,rules:rules.map(r=>({id:r.id,name:r.name,hash:r.hash,source:r.source,offset:r.offset})),capabilities:actions.map(action=>({id:domain+'.'+action,state:'NATIVE_CONTRACT_NOT_VERIFIED',executable:false})),unresolved:['native eligibility','resource/fee model','receipt semantics','role benefit',...(!rules.length?['static formula coverage']:[])],runtimeVerified:false};
  });
- return {version:1,build,domainCount:rows.length,rows,fullyKnown:false};
+ return {version:2,build,domainCount:rows.length,rows,dna,fullyKnown:false};
 }
 module.exports={domains,compile};

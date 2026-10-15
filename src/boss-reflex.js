@@ -29,4 +29,5 @@ function installBossReflex(config){
    setTimeout(()=>{const distance=pos&&pos.room===start.room&&Date.now()-pos.at<1000?Math.hypot(pos.x-start.x,pos.z-start.z):null;lesson.attempts++;if(distance!==null){if(distance>radius)lesson.outside++;else lesson.short++;}b.lessons[lessonKey]=lesson;event({boss:mon.id,skill:skill.kind,radius,distance,status:distance===null?'unknown':distance>radius?'outside_at_check':'insufficient_distance'});release();},620);
   }catch{}});return ws;}});
 }
-module.exports={installBossReflex};
+function mastery(world,combat){const moves=Object.entries(world?.BOSS_MOVES||world?.MONSTER_SKILLS||{}).map(([id,skills])=>({id,skills:skills.map(s=>({kind:s.kind,trigger:s.trigger,interval:s.interval??null,threshold:s.threshold??null,radius:s.radius??null,range:s.range??null,damageScale:s.damageScale??s.dmg??null})),observed:(combat?.windows||[]).filter(w=>w.target===id).map(w=>({map:w.map,party:w.party,deaths:w.deaths,potionsPerMinute:w.potionsPerMinute,damageTakenPerSecond:w.damageTakenPerSecond,ttkMs:w.ttkMs})).slice(-8)}));return {moves,evidence:'native_public_moves_and_scoped_combat_history',dodgeTimingVerified:false,autoMovementPermission:false};}
+module.exports={installBossReflex,mastery};

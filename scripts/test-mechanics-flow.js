@@ -24,7 +24,7 @@ async function main(){
  const response=await GameInstance.prototype.queryDailyQuotas.call(query);assert.equal(evaluations,1);assert.deepEqual(sent.map(x=>x[0]),['twq','gdq']);assert(response.every(x=>x.ok),'only existing read commands, never start/spend');
  // Exercise the real federation entry point: an idle coordinator and one
  // member's remaining quota must leave that member's navigation available.
- const member={credentials:{charName:'fixture'},status:'playing'},f={machine:'tum',now:()=>now,root:'.',local:{build},daily:{policy:{enabled:true},gate:()=>({allowed:true}),view},activity:{view:()=>({phase:'IDLE'}),act:async()=>{}},log(){}};
+ const member={credentials:{charName:'fixture'},status:'playing'},f={coordinator:true,machine:'tum',now:()=>now,root:'.',local:{build},daily:{policy:{enabled:true},gate:()=>({allowed:true}),view},activity:{view:()=>({phase:'IDLE'}),act:async()=>{}},log(){}};
  Federation.prototype.refreshTeamActivities.call(f,{instances:[member]});await new Promise(r=>setImmediate(r));assert.equal(member.dailyTeamPending,false);assert.equal(member.dailyWorkStatus.mode,'interim');
  f.activity.view=()=>({...intent,at:now,deadline:now+100000});Federation.prototype.refreshTeamActivities.call(f,{instances:[member]});assert.equal(member.dailyTeamPending,true);
  console.log('PASS daily ownership/current-build expiry, interim progress, single query evaluation, coalescing/freshness/backoff and no quota-success inference');

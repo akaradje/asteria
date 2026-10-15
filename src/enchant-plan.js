@@ -18,7 +18,7 @@ function plan(save,items,world,wiki){
  const reserve=Math.max(1000,(save.lv||1)*100),spare=Math.max(0,(save.coins||0)-reserve);
  const runeReserve=Math.max(3,...(wiki?.crafting?.recipes||[]).map(r=>r.cost?.['Ancient Rune']||0));
  const rune=tier>=4&&!lines[2]&&(save.keyItems?.['Ancient Rune']||0)>runeReserve;
- const base={id,name:it.name,lines,expected:lines.map(text),locks,cost,rune,runeReserve,chance3:Math.min(.25,.08+(save.enchPity||0)*.01),reserve};
+ const base={rolePrior:require('./knowledge/modifier-effects').roleWeights(save.job,world),empiricalPolicy:save.empiricalCombatPreferences||null,benefitMeasured:false,id,name:it.name,lines,expected:lines.map(text),locks,cost,rune,runeReserve,chance3:Math.min(.25,.08+(save.enchPity||0)*.01),reserve};
  if(tier<4)return {...base,ready:false,reason:'เก็บงบออฟไว้สำหรับอาวุธ Tier 4 ขึ้นไป'};
  if(count===3)return {...base,ready:false,reason:'เก็บออฟครบทั้งสามแถวแล้ว ไม่สุ่มทับ'};
  if((save.tokens||0)<cost.tokens)return {...base,ready:false,reason:`รอ Token ${cost.tokens} เพื่อล็อกของดี ไม่ปลดล็อกเพื่อฝืนสุ่ม`};

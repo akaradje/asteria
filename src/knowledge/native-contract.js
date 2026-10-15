@@ -18,7 +18,7 @@ function functions(text){
 const parsed=new Map();
 function contractFunctions(text,digest){
  if(parsed.has(digest))return parsed.get(digest);
- const wanted=new Set(['forgeSend','renderRefineMain','forgeMessage','forgeConfirm','recipeReady','recipeOut','takeCost','renderExchangeMain','exGoHTML','gachaBind','achBind','mailTake','giftReceived','doEnchant','astralMessage','renderRefineShop']);
+ const wanted=new Set(['mkSend','marketMessage','forgeSend','renderRefineMain','forgeMessage','forgeConfirm','recipeReady','recipeOut','takeCost','renderExchangeMain','exGoHTML','gachaBind','achBind','mailTake','giftReceived','doEnchant','astralMessage','renderRefineShop']);
  const map=new Map(),scripts=[...text.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(m=>!/(?:application\/json|application\/ld\+json)/i.test(m[1])).map(m=>m[2]);if(!scripts.length)scripts.push(text);
  for(const source of scripts){if(!source.trim())continue;const tree=acorn.parse(source,{ecmaVersion:'latest'});walk(tree,(n,a)=>{if(n.type==='CallExpression'&&['forgeSend','NET.social'].includes(member(n.callee))&&['rfup','gsbuy','rfbuy'].includes(n.arguments[0]?.value)){const rows=map.get('__paidSites')||[];rows.push(n);map.set('__paidSites',rows);}
  if(n.type==='FunctionDeclaration'&&wanted.has(n.id?.name)){const rows=map.get(n.id.name)||[];rows.push(n);map.set(n.id.name,rows);}if(n.type==='CallExpression'&&member(n.callee)==='NET.social'&&['aspt','asbt'].includes(n.arguments[0]?.value)){const outer=a.filter(x=>['ArrowFunctionExpression','FunctionExpression'].includes(x.type)).findLast(x=>rejects(x,t=>unary(t,'NET.online'),n.start));const rows=map.get('__astralHandlers')||[];rows.push({n,anc:a.filter(x=>x!==tree&&!['Program','BlockStatement'].includes(x.type)&&x.type!=='FunctionDeclaration'&&(x.type!=='FunctionExpression'||x.params.length>0)),outer});map.set('__astralHandlers',rows);}});}
@@ -99,6 +99,7 @@ function enchant(map){
  if(!f.async||send.length!==1||!flush.length||flush[0].start>send[0].start||!rejects(f,t=>member(t)==='enchBusy')||!rejects(f,t=>{const terms=disjunction(t);return terms.some(x=>binary(x,'player.coins','<','c.coins'))&&terms.some(x=>binary(x,'player.tokens','<','c.tokens'))}))throw Error('native bounded enchant budget/flush dispatch changed');
  return {boundedRoll:true};
 }
+function market(map){const f=unique(map,'mkSend'),r=unique(map,'marketMessage');safeExecution(f);safeExecution(r);const sends=calls(f,'NET.social'),flush=calls(f,'NET.flush');if(!f.async||sends.length!==1||!flush.length||flush[0].start>sends[0].start||!calls(f,'saveGame').length||!rejects(f,t=>disjunction(t).some(x=>member(x)==='mkBusy')&&disjunction(t).some(x=>unary(x,'NET.online')))||!calls(r,'applyDelta').some(c=>member(c.arguments[0])==='m.d')||!calls(r,'NET.setRev').some(c=>member(c.arguments[0])==='m.rev')||!calls(r,'saveGame').length)throw Error('native market serialized online save/flush/reply contract changed');return {singleDispatch:true,receipt:'native_delta_revision'};}
 function astral(text,map){
  const reply=unique(map,'astralMessage');safeExecution(reply);if(!calls(reply,'applyDelta').length||!ids(reply).has('astralSave')||!ids(reply).has('did'))throw Error('native Astral state/delta acknowledgement missing');
  let points,bt;
@@ -108,7 +109,7 @@ function astral(text,map){
 const cache=new Map();
 function validate(text,kind){
  const digest=crypto.createHash('sha256').update(text).digest('hex'),key=kind+':'+digest;if(cache.has(key))return cache.get(key);
- let result;try{const map=contractFunctions(text,digest);let facts;if(kind==='refine')facts=refine(map);else if(kind==='craft')facts=craft(map);else if(kind==='rewards')facts=rewards(map);else if(kind==='enchant')facts=enchant(map);else if(kind==='astral')facts=astral(text,map);else throw Error('unsupported semantic contract');result={allowed:true,version:1,kind,facts,sourceDigest:digest,evidence:'AST_transaction_contract',autoApproved:true};}catch(e){result={allowed:false,version:1,kind,reason:e.message,sourceDigest:digest,autoApproved:false};}
+ let result;try{const map=contractFunctions(text,digest);let facts;if(kind==='refine')facts=refine(map);else if(kind==='craft')facts=craft(map);else if(kind==='rewards')facts=rewards(map);else if(kind==='enchant')facts=enchant(map);else if(kind==='market')facts=market(map);else if(kind==='astral')facts=astral(text,map);else throw Error('unsupported semantic contract');result={allowed:true,version:1,kind,facts,sourceDigest:digest,evidence:'AST_transaction_contract',autoApproved:true};}catch(e){result={allowed:false,version:1,kind,reason:e.message,sourceDigest:digest,autoApproved:false};}
  if(cache.size>=12)cache.clear();cache.set(key,result);return result;
 }
 function dataConstruction(code){

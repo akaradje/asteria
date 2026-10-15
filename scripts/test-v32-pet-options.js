@@ -8,9 +8,11 @@ assert.deepEqual(native.pools.map(p => p.length), [11, 15, 5]);
 const changedRow = "{ k: 'atk', w: 14, per: [2, 3, 4, 6, 8] }", nextRow = "{ k: 'atk', w: 14, per: [2, 3, 9, 6, 8] }";
 assert(rules.extract(raw.replace(changedRow, nextRow)).complete, 'unrelated earlier weapon pool does not invalidate pet data');
 const at = raw.indexOf('  const ENCH_PET = [');
-for (const change of [raw.slice(0, at) + raw.slice(at).replace(changedRow, nextRow),
+const changedPool=rules.extract(raw.slice(0,at)+raw.slice(at).replace(changedRow,nextRow)); assert(changedPool.complete); assert.notEqual(changedPool.revision,native.revision); assert.equal(changedPool.pools[0][0].per[2],9);
+assert(rules.extract(raw.replace('const ENCH_STEP_W = [36, 28, 20, 11, 5]', 'const ENCH_STEP_W = [36, 28, 20, 10, 6]')).complete,'new finite native star distribution is data, not execution approval');
+for (const change of [
   raw.replace('const ENCH_PET_TIER = lv =>', 'const changedTier = lv =>'),
-  raw.replace('const ENCH_STEP_W = [36, 28, 20, 11, 5]', 'const ENCH_STEP_W = [36, 28, 20, 10, 6]'),
+  raw.replace('const ENCH_STEP_W = [36, 28, 20, 11, 5]', 'const ENCH_STEP_W = [36, 28, 20, 11, -5]'),
   raw.replace('enchAdd(petOpts[player.petActive]);', 'enchAdd(petOpts.other);'),
   raw + '\n  const ENCH_PET = [', raw.replace('  const ENCH_PET = [', '  const ENCH_PET = globalThis.badCode() || [')])
   assert(!rules.extract(change).complete, 'unknown or executable pool changes never retain old approval');

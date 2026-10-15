@@ -93,7 +93,7 @@ async function execute(i, best) {
         !storage.equal(before.state.pets, i.lastSave.pets) ||
         before.state.petActive !== (i.lastSave.petActive || null)) return {worn: 0, reason: 'pet-native-baseline-required'};
     if (before.state.petActive === best.id) return {worn: 0, confirmed: true, pet: best.id, evidence: 'server_readback', actionSent: false};
-    const selected = planner.choose({...i, lastSave: before.state}, i.catalog()).selected;
+    const selected = planner.choose({...i, lastSave: {...before.state,empiricalCombatPreferences:i.lastSave.empiricalCombatPreferences}}, i.catalog()).selected;
     if (selected?.id !== best.id || !await nativeButton(i, best.id)) return {worn: 0, reason: 'pet-plan-or-native-button-changed'};
     i.v2.scheduler.checkpoint();
     if (!gate(i, best.id).allowed || !currentReceipt(i, before) ||

@@ -6,6 +6,7 @@ function facts(m){
  if(m.equipmentExecution)values.equipmentExecution=m.equipmentExecution;
  if(m.executionGates)values.executionGates=m.executionGates;
  if(m.paymentRecovery)values.paymentRecovery=m.paymentRecovery;
+ if(m.intelligence)values.intelligence=m.intelligence;
  if(m.system)values.system=m.system;
  if(m.vitals||m.independentStrategy)values.strategyScope={vitals:m.vitals||null,independentStrategy:m.independentStrategy===true,paymentAuthority:false};
  return Object.entries(values).map(([kind,value])=>({id:scope+':'+kind+':'+digest(value),kind,value,authority:kind==='identity'&&m.actorId?'authenticated_native_identity':'observed_snapshot_not_transaction_receipt'}));

@@ -34,7 +34,7 @@ class CompletionMeasurements{
   for(const r of this.data.stages.filter(r=>r.build===build&&r.signature===signature&&at>=r.at&&at-r.at<86400000)){
    const out=result[r.goalId]||={};out[r.stage]={build,at:r.at,confirmed:true,samples:r.samples,meanMs:r.totalMs/r.samples,scope:'exact_actor_build_pre_action_loadout_goal',authority:'server_accepted_exact_save_revision'};
   }
-  const yields=Object.fromEntries(yieldRows.map(r=>[r.mapId+':'+r.monsterId+':'+r.name,{build,at:r.at,samples:r.samples,observedMs:r.observedMs,netPerHour:r.net*3600000/r.observedMs,deaths:r.deaths,authority:'server_accepted_save',causalVerified:false}]));
+  const yields=Object.fromEntries(yieldRows.map(r=>[r.mapId+':'+r.monsterId+':'+r.name,{actorId:this.actorId,signature,build,at:r.at,samples:r.samples,observedMs:r.observedMs,netPerHour:r.net*3600000/r.observedMs,deaths:r.deaths,authority:'server_accepted_save',causalVerified:false}]));
   for(const out of Object.values(result))Object.assign(out,yields);result._yield=yields;return result;
  }
 }

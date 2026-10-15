@@ -30,17 +30,20 @@ function analyze({board,generation,now=Date.now(),inventory={},claims=[],require
  const offers=[...byItem.values()].slice(0,100).map(row=>({item:row.item,kind:row.kind,listingId:row.id,totalPrice:row.price,n:row.n,unitPrice:row.unitPrice,owned:amount(inventory[row.item])?inventory[row.item]:null,observedAskOnly:true,...classify({item:row.item,kind:row.kind,owned:inventory[row.item],claims,requirementsComplete})}));
  const buys=needs.slice(0,32).map(need=>{
   const row=byItem.get(need.item),budget=amount(wallet)&&amount(heldCopper)&&amount(reserveCopper)?Math.max(0,wallet-heldCopper-reserveCopper):null;
-  return {item:need.item,listingId:row?.id||null,reason:!row?(board.queryComplete?'not_in_this_query':'query_incomplete'):budget===null?'budget_unknown':row.price>budget?'preserve_progression_reserve':'requires_full_cycle_eta_and_native_purchase_contract',totalPrice:row?.price??null,unitPrice:row?.unitPrice??null,executable:false};
+  const comparison=row&&need.cycle?require('./market-value').buyVsFarm({...need.cycle,buyPrice:row.price,listingQuantity:row.n,wallet,reserve:reserveCopper,held:heldCopper,now}):null;
+  return {item:need.item,listingId:row?.id||null,comparison,reason:!row?(board.queryComplete?'not_in_this_query':'query_incomplete'):budget===null?'budget_unknown':row.price>budget?'preserve_progression_reserve':'requires_full_cycle_eta_and_native_purchase_contract',totalPrice:row?.price??null,unitPrice:row?.unitPrice??null,executable:false};
  });
  return {...base,state:rules?'OBSERVED':'WAIT_NATIVE_RULES',boardAt:board.at,parameters:{tax:board.tax,fee:board.fee,max:board.max},queryComplete:board.queryComplete,visible:board.list.length,offers,buys,reason:'asking_prices_are_not_completed_sales_or_income'};
 }
 function observe(i,now=Date.now()){
- const market=i.socialInbox?.market,b=market?.board;if(!b||i.marketShadow?.boardAt===b.at)return i.marketShadow;
+ const market=i.socialInbox?.market,b=market?.board;if(!b)return i.marketShadow;
  const s=i.lastSave||{},inventory={...(s.materials||{}),...(s.consumables||{}),'Red Potion':s.potions};
  for(const item of s.bag||[]){const id=typeof item==='string'?item:item.id;if(id)inventory[id]=(inventory[id]||0)+1;}
  for(const [id,n]of Object.entries(s.cards||{}))inventory['cd:'+id]=n;
- const needs=(i.personalBrain?.craft?.missing||[]).filter(x=>typeof x.name==='string').map(x=>({item:x.name}));
+ const craft=i.personalBrain?.craft,signature=require('../learning/completion-measurements').context(s),route=i.v2?.expRouteEvidence?.summarize(i.v2?.expRouteEvidence?.matching(s,i.v2?.learningRevision,i.goal));
+ const needs=(craft?.missing||[]).filter(x=>typeof x.name==='string').map(x=>{const measured=Object.entries(i.acquisitionMeasurements?._yield||{}).filter(([key,r])=>key.endsWith(':'+x.name)&&r.actorId===i.actorIdentity?.actorId&&r.signature===signature&&r.build===i.catalog().build&&r.samples>=10&&r.observedMs>=300000&&r.deaths===0&&r.at<=now&&now-r.at<=3600000&&r.netPerHour>0).sort((a,b)=>b[1].netPerHour-a[1].netPerHour)[0]?.[1];const stages=i.acquisitionMeasurements?.[craft?.id]||{};
+  return {item:x.name,cycle:{actorId:i.actorIdentity?.actorId,build:i.catalog().build,signature,measurement:measured,short:Math.max(0,x.want-x.have),farmRatePerHour:measured?.netPerHour,copperPerHour:route?.confidence==='observational'&&route.deaths===0?route.copperPerHour:null,travelMs:i.marketCycleMeasurements?.travelMs,buyMs:i.marketCycleMeasurements?.buyMs,craftMs:stages.craft?.meanMs,equipMs:stages.equip?.meanMs,verifyMs:i.marketCycleMeasurements?.verifyMs}};});
  // Fleet demand completeness is deliberately not inferred from a local bag.
- const catalog=i.catalog();i.marketShadow=analyze({board:b,generation:market.generation,now,inventory,requirementsComplete:false,wallet:s.coins,heldCopper:i.v2?.reservations?.totals()?.Copper||0,reserveCopper:require('../upgrade-reserve').reserve(s,catalog.world),needs});return i.marketShadow;
+ const catalog=i.catalog();i.marketShadow=analyze({board:b,generation:market.generation,now,inventory,requirementsComplete:false,wallet:s.coins,heldCopper:require('../runtime/paid-actions').heldResources(i).Copper||0,reserveCopper:require('../upgrade-reserve').reserve(s,catalog.world),needs});i.marketShadow.authorizedMaterialListing=require('../runtime/market-sell').plan(i,now);i.marketShadow.sellMode='bounded_native_receipt_executor';return i.marketShadow;
 }
 module.exports={reserved,classify,history,analyze,observe};

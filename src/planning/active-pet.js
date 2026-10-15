@@ -25,7 +25,8 @@ function rank(save,cat,root=process.cwd()){
   const stat=economy.score({stats:Object.fromEntries(Object.entries(bonus).filter(([key])=>key.startsWith('st_')))},save.job,cat.world),direct=Object.entries(bonus).filter(([key])=>!key.startsWith('st_')).reduce((sum,[key,value])=>sum+value*(weights[key]||0),0),damageShare=share[tier]*(elite?1.25:1);
   rows.push({id,name:m.name,tier,friendship:n,bonus,damageShare,optionComplete:opts.complete,optionRevision:opts.revision||null,optionReason:opts.reason||null,score:Math.round((stat+direct+baseline*damageShare)*100)/100});
  }
- rows.sort((a,b)=>b.score-a.score||Number(b.id===save.petActive)-Number(a.id===save.petActive)||a.id.localeCompare(b.id));return rows;
+ for(const row of rows)row.empiricalPolicy=require('./theorycraft').preference(save,cat,save.equip,row.id);
+ rows.sort((a,b)=>Number(!!b.empiricalPolicy)-Number(!!a.empiricalPolicy)||b.score-a.score||Number(b.id===save.petActive)-Number(a.id===save.petActive)||a.id.localeCompare(b.id));return rows;
 }
 // Project only owned pets; a projected tier is never evidence of actual ownership or power.
 function development(save,cat){

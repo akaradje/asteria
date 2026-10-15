@@ -23,11 +23,13 @@ function decorate(i,rows,now=Date.now()){
   if(!Number.isFinite(gain)&&g.itemId&&cat.items[g.itemId])gain=require('../gear-value').compare(save,cat,g.itemId).gain;
   if(g.kind==='astral-training')gain=astral?.fresh?astralPoint(save,cat,astral.state):null;
   if(g.kind==='card-collection'&&g.cardId)gain=delta(save,{...save,cardAlbum:{...save.cardAlbum,[g.cardId]:1}},cat);
-  const learned=i.v2?.farmEvidence?.matching?.(save,i.v2.learningRevision||cat.build,g),rate=learned?.samples>=10&&learned.ms>=300000&&!learned.deaths&&now>=learned.at&&now-learned.at<86400000?learned.kills/learned.ms:null;
+  const learned=i.v2?.farmEvidence?.matching?.(save,i.v2.learningRevision||cat.build,g),combat=i.combatEvidence?.view(i,now)?.current,measuredRate=combat?.ready&&combat.actorId===context.actorId&&combat.build===cat.build&&combat.target===g.monsterId&&combat.map===g.mapId&&combat.deaths===0&&combat.killsPerHour>0?combat.killsPerHour/3600000:null;
+  const rate=measuredRate??(learned?.samples>=10&&learned.ms>=300000&&!learned.deaths&&now>=learned.at&&now-learned.at<86400000?learned.kills/learned.ms:null);
   const m=cat.world.MONSTERS?.find(m=>m.id===g.monsterId),kills=g.expectedKills??g.acquisition?.expectedKills;
   if(Number.isFinite(kills)&&kills>0)seconds=rate?kills/rate/1000:m?.hp>0?kills*(2+m.hp/5000):null;
   if(g.kind==='astral-training'&&m?.exp>0&&astral?.state?.need>astral.state.exp){const left=astral.state.need-astral.state.exp;seconds=rate?left/(rate*m.exp)/1000:left/m.exp*(2+m.hp/5000);}
-  return {...g,expectedCombatGain:gain,expectedDurationMs:g.expectedDurationMs??(Number.isFinite(seconds)?seconds*1000+Math.max(0,g.travelMs||g.acquisition?.travelMs||0):null)};
+  const meta=i.competitiveMeta?.build===cat.build&&now>=i.competitiveMeta.at&&now-i.competitiveMeta.at<360000?i.competitiveMeta.targets?.find(t=>t.id===g.itemId):null;
+  return {...g,metaBenchmark:meta?{benchmark:meta.benchmark,observedAt:meta.observedAt,estimatedBaseGain:meta.baseGain,optimalVerified:false}:null,combatRateMeasured:!!measuredRate,expectedCombatGain:gain,expectedDurationMs:g.expectedDurationMs??(Number.isFinite(seconds)?seconds*1000+Math.max(0,g.travelMs||g.acquisition?.travelMs||0):null)};
  });return rank(out,{context,now});
 }
 function rank(rows,{context={},now=Date.now()}={}){

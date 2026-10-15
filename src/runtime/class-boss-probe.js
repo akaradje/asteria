@@ -105,6 +105,7 @@ function combatStopReason(i,now=Date.now()){
  if(!fresh.decisionGate(i,now).allowed)return 'native-save-stale';
  if(!fresh.fresh(i.vitals?.at,2000,now))return 'native-hp-stale';
  if(!(i.vitals.hp>=.65))return 'native-hp-below-combat-minimum';
+ const mastery=require('../planning/boss-mastery').view(i,now);if(mastery?.retreat)return 'empirical-survival-budget-insufficient';
  if(r.supported&&!support(i,r,now))return 'nearby-tank-healer-support-not-ready';
  return null;
 }

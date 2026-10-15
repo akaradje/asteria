@@ -1,0 +1,11 @@
+'use strict';
+function analyze(view,save,cat,{now=Date.now()}={}){
+ const base={at:now,build:cat.build,job:save.job,scope:'observed_server_top10_not_class_leaderboard',measuredOptimal:false};
+ if(!view||view.build!==cat.build||!Number.isFinite(view.at)||now<view.at||now-view.at>360000)return {...base,state:'UNKNOWN',peers:0,gaps:[],sets:[]};
+ const canonical=job=>cat.world.HC_MERGED?.[job]||job;
+ const peers=(view.peers||[]).filter(p=>p.currentTop10&&p.fresh&&p.compatible&&canonical(p.job)===canonical(save.job)&&!p.hidden&&!p.gone&&Number.isFinite(p.at)&&now>=p.at&&now-p.at<=900000),sets=[],gaps=[];
+ for(const [id,set]of Object.entries(cat.world.EQUIPMENT_SETS||{})){const counts=peers.map(p=>set.pieces.filter(x=>Object.values(p.gear||{}).some(g=>g.id===x)).length),worn=counts.filter(n=>n>=set.pieces.length).length;if(worn)sets.push({id,observed:worn,among:peers.length,ownPieces:set.pieces.filter(x=>Object.values(save.equip||{}).includes(x)).length,requiredPieces:set.pieces.length,bonus:set.bonus,estimated:true});}
+ for(const slot of ['weapon','offhand','head','armor','boots','wing','acc1','acc2']){const observations=peers.flatMap(p=>{const g=p.gear?.[slot];return g&&Number.isFinite(g.refine)?[{refine:g.refine,id:g.id,name:p.name,stage:g.stage,cards:g.cards,options:g.options}]:[];}).sort((a,b)=>a.refine-b.refine);if(!observations.length)continue;const median=observations[Math.floor(observations.length/2)].refine,own=save.equip?.[slot],refine=save.refine?.[own]||0;gaps.push({slot,ownId:own||null,ownRefine:refine,medianRefine:median,refineGap:Math.max(0,median-refine),samples:observations.length,items:[...new Set(observations.map(x=>x.id))],nativeMaximum:cat.world.REFINE?.max??null});}
+ return {...base,state:peers.length?'OBSERVED':'UNKNOWN',peers:peers.length,sets:sets.sort((a,b)=>b.observed-a.observed).slice(0,8),gaps,targets:(view.targets||[]).filter(t=>peers.some(p=>p.name===t.benchmark)&&Number.isFinite(t.observedAt)&&now>=t.observedAt&&now-t.observedAt<=900000).slice(0,8),limitations:['Top10 by available server category, filtered to native canonical class; not a native class-specific ranking','Inspect data omits private stats and cannot prove optimal builds','Gear history is observed direction, not a guaranteed development route']};
+}
+module.exports={analyze};

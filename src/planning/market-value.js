@@ -18,4 +18,11 @@ function acquisition({buyPrice,availableCopper,reservedCopper,travelMs,buyMs,cra
  const downstream=craftMs+equipMs+verifyMs,buyTotal=travelMs+buyMs+downstream,farmTotal=farmMs+downstream;
  return {choice:buyTotal<farmTotal?'buy_candidate':'farm',buyTotalMs:buyTotal,farmTotalMs:farmTotal,estimated:true,executable:false};
 }
-module.exports={surplus,listingValue,acquisition};
+function buyVsFarm({buyPrice,wallet,reserve,held=0,short,listingQuantity,farmRatePerHour,copperPerHour,travelMs,buyMs,craftMs,equipMs,verifyMs,measurement,actorId,build,signature,now=Date.now()}={}){
+ const stages=[travelMs,buyMs,craftMs,equipMs,verifyMs],valid=measurement?.actorId===actorId&&actorId&&measurement.build===build&&build&&measurement.signature===signature&&signature&&measurement.samples>=10&&measurement.observedMs>=300000&&measurement.deaths===0&&measurement.at<=now&&now-measurement.at<=3600000;
+ if(!valid||![buyPrice,wallet,reserve,held,short,listingQuantity].every(amount)||short<=0||listingQuantity<short||stages.some(x=>!Number.isFinite(x)||x<0)||!Number.isFinite(farmRatePerHour)||farmRatePerHour<=0)return {choice:'observe',reason:'matched_full_cycle_rates_and_exact_listing_required',executable:false};
+ const spendable=Math.max(0,wallet-reserve-held),earnNeed=Math.max(0,buyPrice-spendable),earnMs=earnNeed===0?0:Number.isFinite(copperPerHour)&&copperPerHour>0?earnNeed*3600000/copperPerHour:null;
+ const downstream=craftMs+equipMs+verifyMs,farmMs=short*3600000/farmRatePerHour+travelMs+downstream,buyMsTotal=earnMs===null?null:earnMs+travelMs+buyMs+downstream;
+ return {choice:buyMsTotal===null?'farm':buyMsTotal<farmMs?(earnNeed?'earn_then_buy_candidate':'buy_candidate'):'farm',farmTotalMs:farmMs,buyTotalMs:buyMsTotal,earnCopper:earnNeed,earnMs,spendableCopper:spendable,reserveCopper:reserve,heldCopper:held,listingQuantity,buyPrice,estimated:true,executable:false,requires:'fresh_native_quote_budget_owner_market_contract_exact_receipt_and_wallet_item_save_deltas',surplusSalesCountedAsIncome:false};
+}
+module.exports={surplus,listingValue,acquisition,buyVsFarm};

@@ -9,13 +9,13 @@ const STAGES=[
  {id:'wing-chain',name:'ปีกและลำดับคราฟ',requires:['sustain','class-build'],focus:'focus_craft'},
  {id:'yield-trials',name:'ทดลองแผนหา EXP และเงิน',requires:['sustain','loadout'],focus:null},
  {id:'boss-mechanics',name:'ฝึกบอสและกลไกการต่อสู้',requires:['sustain','loadout'],focus:null},
- {id:'team-dungeons',name:'ทีม 6 อาชีพและดันเจี้ยน',requires:['boss-mechanics'],focus:null},
+ {id:'team-dungeons',name:'ทีม 3 ตัวต่อโฮสต์และดันเจี้ยน',requires:['boss-mechanics'],focus:null},
  {id:'guild-endgame',name:'กิลด์ หอคอย และชุดปลายทาง',requires:['team-dungeons'],focus:null},
 ];
 const check=(label,value,evidence)=>({label,status:value==null?'unknown':value?'met':'missing',evidence});
 function assess(i,cat,{build,now=Date.now(),bookRevision,contexts=[],contextBuild=build}={}){
  const s=i.lastSave||i,at=i.lastSaveAt||0,age=now-at,fresh=age>=0&&age<=30000,held=economy.ownedNames(s),reserve=require('../upgrade-reserve').reserve(s,cat.world);
- const equipment=['weapon','head','armor','boots'].map(slot=>{const it=cat.items?.[s.equip?.[slot]];return {slot,id:s.equip?.[slot]||null,reqLv:it?.reqLv||null,tier:it?.tier||null,appropriate:!!it&&(it.reqLv||1)>=Math.min(60,Math.max(1,(s.lv||1)*.5))};});
+ const equipment=['weapon','offhand','head','armor','boots','wing','acc1','acc2'].map(slot=>{const it=cat.items?.[s.equip?.[slot]];return {slot,id:s.equip?.[slot]||null,reqLv:it?.reqLv||null,tier:it?.tier||null,nativeRefineMaximum:require('../equipment-goal').target(cat,slot),appropriate:!!it&&economy.canUse(it,s.job,cat.world)&&(it.reqLv||1)<=(s.lv||1)&&(it.reqLv||1)>=Math.min(60,Math.max(1,(s.lv||1)*.5))};});
  const signature=context(contextBuild,s);
  const observed=contexts.filter(c=>c.build===contextBuild&&c.signature===signature&&c.confidence==='observational'&&c.elapsedMs>=300000&&c.samples>=10&&c.updatedAt<=now&&now-c.updatedAt<86400000&&c.deaths===0);
  const matched=new Map();for(const c of observed){const maps=matched.get(c.signature)||new Set();maps.add(c.map);matched.set(c.signature,maps);}const comparable=[...matched.values()].some(m=>m.size>=2);

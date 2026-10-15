@@ -10,4 +10,5 @@ function value(c,need,source,{finishable=false,travelMs=0}={}){
   score:(finishable?2600:1800)+(c.fillsEmpty?180:0)+Math.min(180,gain*2)-Math.min(450,Math.log1p(expectedKills)*55)-Math.min(180,travelMs/5000),
   method:'reviewed_drop_odds_and_remaining_quantity; expected kills are not guaranteed; gear gain is not DPS'};
 }
-module.exports={effort,value};
+function measuredTime(need,measurement,{actorId,build,signature,now=Date.now(),travelMs}={}){const short=need.want-need.have;if(!Number.isFinite(short)||short<=0||measurement?.actorId!==actorId||!actorId||measurement.build!==build||!build||measurement.signature!==signature||!signature||measurement.samples<10||measurement.observedMs<300000||measurement.deaths!==0||!Number.isFinite(measurement.at)||now<measurement.at||now-measurement.at>3600000||!Number.isFinite(measurement.netPerHour)||measurement.netPerHour<=0||!Number.isFinite(travelMs)||travelMs<0)return {known:false,etaMs:null};return {known:true,etaMs:short*3600000/measurement.netPerHour+travelMs,estimated:true,evidence:'matched_observed_net_material_rate_including_route_costs'};}
+module.exports={effort,value,measuredTime};

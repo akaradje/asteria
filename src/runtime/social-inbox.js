@@ -14,7 +14,7 @@ class SocialInbox{
  }
  sent(payload,at=Date.now()){
   if(typeof payload!=='string'||payload.length>1000000)return;
-  try{const m=JSON.parse(payload);this.market.sent(m,at);}catch{}
+  try{const m=JSON.parse(payload);this.market.sent(m,at);this.power.combat.sent(m,at);}catch{}
  }
  clear(){this.latest=new Map();this.rows=[];this.streamAt=null;this.criticalGap=false;this.metrics={oversize:0,batchOverflow:0,invalid:0};this.bossPositions?.clear();this.astral?.reset(this.generation||0);this.power?.reset(this.generation||0);this.market?.reset(this.generation||0);this.buildLab?.reset(this.generation||0);}
  receive(payload,at=Date.now()){
