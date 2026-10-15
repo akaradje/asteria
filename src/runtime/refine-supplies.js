@@ -50,9 +50,15 @@ async function tick(i){
     store.receipt(row.id,{receiptId:'smith-supply:'+p.actorId+':'+row.id+':'+event.sequence,actorId:p.actorId,session:row.session,generation:row.generation,kind:row.kind,authority:'server_readback',at:after.proof.at,applied:!rejected,proof:{...after.proof,socket:event,delta:rejected?{}:{Copper:-current.price,[current.name]:1}}});
     i.refineSupplyStatus={at:Date.now(),id:row.id,status:rejected?'NOT_APPLIED':'CONFIRMED',kind:current.kind,price:current.price,reason:event.no,authority:'server_socket_and_readback'};return rejected?'native refinement supply rejected without charge':'native refinement supply verified';
    }
-   i.refineSupplyStatus={at:Date.now(),id:row.id,status:'UNCERTAIN',replayBlocked:true,observation:observed.state};
-   store.transition(row.id,'UNCERTAIN',{reason:'Native smith outcome unknown; never resend',supplyObservation:{state:final.state,op:event?.op,no:event?.no,receivedAt:event?.at,deltaValid:event?.deltaValid,readbackAt:after?.proof?.at}});return 'native refinement supply readback pending';
+   i.refineSupplyStatus={at:Date.now(),id:row.id,status:'UNCERTAIN',replayBlocked:true,observation:observed.state,reason:observed.reason||'exact_save_or_revision_proof_not_matched'};
+   store.transition(row.id,'UNCERTAIN',{reason:'Native smith outcome unknown; never resend',supplyObservation:{state:final.state,reason:final.reason||'exact_save_or_revision_proof_not_matched',evidence:final.evidence,op:event?.op,no:event?.no,receivedAt:event?.at,deltaValid:event?.deltaValid,readbackAt:after?.proof?.at}});return 'native refinement supply readback pending';
   }catch{store.transition(row.id,'UNCERTAIN',{reason:'Native smith exception; never resend'});return null;}finally{await i.closeGamePanel();}
  },{contract:require('./action-contract').contract(i,'native-refine-supply')});
 }
-module.exports={opportunity,eligible,receipt,tick};
+function view(i){
+ const status=i.refineSupplyStatus;if(!status?.id)return null;
+ const row=i.registryV32?.store?.get?.(status.id);
+ if(!row||row.actorId!==i.actorIdentity?.actorId||row.kind!=='refine:supply')return {...status,status:'UNKNOWN',lastObservedStatus:status.status,replayBlocked:true,reason:'canonical supply intent unavailable; no replay'};
+ return {...status,status:row.status,lastObservedStatus:status.status,kind:row.target?.supply?.kind,price:row.target?.supply?.price,replayBlocked:true,...(row.status==='RECONCILED'?{reason:'current budget rebased; original outcome remains unknown'}:{})};
+}
+module.exports={opportunity,eligible,receipt,tick,view};

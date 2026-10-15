@@ -1,3 +1,7 @@
+## Exact native forge shape and bounded party-wipe recovery — 2026-10-16T00:50:28.152360+07:00 Asia/Bangkok
+
+Normalize only the observed inert empty stage map in forge supply replies; changed/nonempty equipment effects and unknown paid deltas stay fenced. Require one native command, matching socket effect and exact authenticated wallet/item readback. Withdraw a same-run party after30 seconds of fresh all-participant death evidence, keeping original entry/quota history; temporary death or a survivor resets the lease. Display supply status from the canonical ledger while retaining the historical observation. Final frozen regression and native rollout evidence are recorded separately.
+
 ## Bounded native supply confirmation and review queue stability — 2026-10-15T23:53:34.639790+07:00 Asia/Bangkok
 
 Observe sanitized native forge replies before GET-only wallet/item verification. Support delayed results, guard already-armed confirmation against duplicate dispatch, and close no-charge rejection only with unchanged authenticated wallet/inventory. Uncertain original UUIDs remain quarantined and never resent. Unify native-review queue identity across evidence channels, preserve legacy and completion-time cooldown after long failures, and retain resolved diagnostic history. Offline assertions and runtime outcomes are reported separately.

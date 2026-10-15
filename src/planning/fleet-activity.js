@@ -37,6 +37,12 @@ class FleetActivity{
  }
  if(alive)delete r.healthGapAt; if(!alive){r.reason='wait for six fresh current-build members';if(['OPENING','JOINING','RUNNING'].includes(r.phase)){r.phase='WITHDRAWING';r.reason='team/build health changed';r.healthEvidence={at:now,members:members.map(({src,m},n)=>({name:roster[n].charName,sourceAge:src?now-src.at:null,build:src?.build||null,status:m?.status||null,recycling:!!m?.recycling,positionAge:Number.isFinite(m?.livePos?.at)?now-m.livePos.at:null,saveAge:Number.isFinite(m?.lastSaveAt)?now-m.lastSaveAt:null}))};r.deadline=Math.max(r.deadline,now+180000);}r.at=now;this.persist();return r;}
  if(['JOINING','RUNNING'].includes(r.phase)){
+  const type=r.kind==='tower'?'tw':r.kind==='guild'?'gd':'dg';
+  const wiped=members.length>=2&&members.every(({m})=>{const s=m.activityState?.[type];return m.livePos?.dead===true&&fresh(m.vitals?.at,15000,now)&&m.vitals.hp===0&&s?.build===r.build&&fresh(s.at,45000,now)&&s.run?.id===r.runId&&s.run.member===true&&!s.run.done;});
+  if(wiped){
+   if(!Number.isFinite(r.partyWipeAt)||r.partyWipeAt>now)r.partyWipeAt=now;
+   if(now-r.partyWipeAt>=30000){r.phase='WITHDRAWING';r.reason='party wipe: all native participants dead for 30 seconds';r.wipeEvidence={at:now,since:r.partyWipeAt,runId:r.runId,replayBlocked:true,members:members.map(({m})=>({name:m.charName,hp:m.vitals.hp,dead:m.livePos.dead,at:m.vitals.at,room:m.livePos.room}))};r.deadline=Math.max(r.deadline,now+180000);r.at=now;this.persist();return r;}
+  }else delete r.partyWipeAt;
   const healer=roster.find(x=>x.baseJob==='priest')?.charName;
   const critical=members.filter(({m})=>fresh(m.vitals?.at,15000,now)&&((!m.livePos.dead&&Number.isFinite(m.vitals.hp)&&m.vitals.hp<.25)||(m.charName===healer&&Number.isFinite(m.vitals.mp)&&m.vitals.mp<.15)));
   const unknown=members.filter(({m})=>!fresh(m.vitals?.at,15000,now)||!Number.isFinite(m.vitals.hp)||(m.charName===healer&&!Number.isFinite(m.vitals.mp)));
