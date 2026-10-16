@@ -74,6 +74,7 @@ function routeSupport(i,m,map,now=Date.now()){
 function eligible(i,m,map,now=Date.now(),{route=false}={}){
  const s=i.lastSave||{},cat=i.catalog(),rows=records(i),deny=reason=>({allowed:false,reason});
  if(i.classBossProbeStorageBlocked||rows.some(r=>r.monsterId===m?.id&&r.cooldownUntil>now))return deny('first-clear-cooldown-or-unreadable-history');
+ if(i.goal?.legendaryParty&&i.goal.monsterId===m?.id&&i.goal.mapId===map?.id)return require('../planning/legendary-party').proof(i,i.goal,now,{route});
  const assistance=m&&map?require('./assistance-reservation').intent(i,now,m.id,map.id):null;
  const assigned=assistance?.due&&i.goal?.kind==='milestone-assist'&&i.goal.recipient===assistance.recipient&&i.goal.monsterId===m?.id&&i.goal.mapId===map?.id;
  const supported=support(i,{mapId:map?.id,monsterId:m?.id},now),plannedSupport=route&&!supported&&(assigned||routeSupport(i,m,map,now));
@@ -99,6 +100,7 @@ function eligible(i,m,map,now=Date.now(),{route=false}={}){
 function combatStopReason(i,now=Date.now()){
  const r=i.classBossProbeActive;
  if(!r||r.status!=='running'||now>=r.deadline)return 'probe-not-running-or-deadline';
+ if(r.legendaryParty&&!require('../planning/legendary-party').proof(i,i.goal,now).allowed)return 'legendary-party-evidence-or-rendezvous-lost';
  if(r.build!==i.catalog().build||i.v2?.sourceCoherence?.matches!==true)return 'source-changed';
  if(i.teamControl||i.dailyTeamPending||i.survivalRecovery||i.dailyWorkStatus?.ownsNavigation||i.recycling||i.v2?.trial?.active()||require('./team-trade').blocksNavigation(i))return 'protected-owner-or-recovery';
  if(i.goal?.monsterId!==r.monsterId||i.livePos?.room!==r.mapId||i.managedHuntReady!==[r.build,r.mapId,r.monsterId].join(':'))return 'native-room-or-target-changed';
@@ -150,6 +152,7 @@ async function run(i,g){
  const b=await i.socialLast('bossboard'),now=Date.now();
  if(i.livePos?.room!==g.mapId||!fresh.fresh(b?._receivedAt,30000,now)||!b.list?.some(x=>x.id===g.monsterId&&x.map===g.mapId&&x.up&&!x.next))return {ok:false,reason:'fresh-live-boss-at-arrival-required'};
  const r={at:now,build:i.catalog().build,monsterId:g.monsterId,mapId:g.mapId,material:check.material,supported:check.supported,kills:i.lastSave.bestiary?.[g.monsterId]||0,stock:i.lastSave.materials?.[check.material]||0,potions:require('./survival').hpPots(i.lastSave),deadline:now+90000,status:'running',cooldownUntil:now+900000};
+ if(g.legendaryParty)r.legendaryParty={...g.legendaryParty};
  i.classBossProbes.push(r);i.classBossProbeActive=r;i.classBossProbeStatus=r;persist(i);
  let reason='bounded-first-clear-timeout';
  try{

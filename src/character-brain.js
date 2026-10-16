@@ -38,7 +38,8 @@ function profile(save,cat,wiki,{reserved={},equipmentOnly=false,blockedCraftIds=
  // The first usable wing precedes later wing tiers and ordinary equipment.
  if(milestones.stage==='wing'){const first=[craftPortfolio.selected,...craftPortfolio.alternatives].filter(Boolean).sort((a,b)=>a.reqLv-b.reqLv||(cat.items[a.id]?.tier||0)-(cat.items[b.id]?.tier||0))[0];if(first)craftPortfolio.selected=first;}
  const craft=craftPortfolio.selected;
- const gear=milestones.equipmentAllowed?economy.gearFarm({lv,job,world,items,wiki,limit:1000}).map(g=>({...g,comparison:require('./gear-value').compare(save,cat,g.itemId)})).filter(g=>!held.includes(g.itemId)&&g.comparison.upgrade).sort((a,b)=>Number(!save.equip?.[b.comparison.slot])-Number(!save.equip?.[a.comparison.slot])||Number(!!b.comparison.goalPromotion)-Number(!!a.comparison.goalPromotion)||Number(benchmarks.has(b.itemId))-Number(benchmarks.has(a.itemId))||b.score-a.score||b.ratePct-a.ratePct).slice(0,8):[];
+ const gear=milestones.equipmentAllowed?economy.gearFarm({lv,job,world,items,wiki,limit:1000}).map(g=>({...g,comparison:require('./gear-value').compare(save,cat,g.itemId)})).filter(g=>!held.includes(g.itemId)&&g.comparison.upgrade).sort((a,b)=>Number(!save.equip?.[b.comparison.slot])-Number(!save.equip?.[a.comparison.slot])||Number(!!b.comparison.goalPromotion)-Number(!!a.comparison.goalPromotion)||Number(benchmarks.has(b.itemId))-Number(benchmarks.has(a.itemId))||b.score-a.score||b.ratePct-a.ratePct):[];
+ const orderedGear=require('./planning/legendary-acquisition').prioritize(gear,save,cat).slice(0,8);gear.splice(0,gear.length,...orderedGear);
  const progression=require('./planning/endgame').assess(save,cat,wiki,{craft,gear});
  const curriculum=require('./learning/mastery-curriculum').focusFromState(save,cat,{craft,gear});
  const top10Mode=require('./equipment-goal').policy(cat).top10Progression===true;

@@ -21,7 +21,10 @@ async function tick(i,s,now=Date.now()){
  const owner=i.v2?.scheduler?.context?.getStore();if(!owner||owner.kind!=='tick'||i.v2.scheduler.closed)return;
  i.v2.scheduler.checkpoint();
  i.marketResearchStatus={state:'requested',requestedAt:now,generation:i.socialInbox.generation,nextAt:now+300000+(i.slot||0)*1700,mode:'read_only'};
- try{const result=await i.socialSend('mq',{q:'',cat:'all',sort:'cheap',slot:''});if(result?.ok!==true)i.marketResearchStatus.state='query_not_sent';}
+ const target=i.developmentProgress?.legendaryAcquisition?.targets?.[0];
+ const query=target?{q:target.name,cat:'gear',sort:'cheap',slot:target.slot?.startsWith('acc')?'acc':target.slot||''}:{q:'',cat:'all',sort:'cheap',slot:''};
+ if(target)i.marketResearchStatus.legendaryTarget=target.itemId;
+ try{const result=await i.socialSend('mq',query);if(result?.ok!==true)i.marketResearchStatus.state='query_not_sent';}
  catch{i.marketResearchStatus.state='response_unverified';}
 }
 module.exports={eligible,tick};

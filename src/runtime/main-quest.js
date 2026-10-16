@@ -8,6 +8,7 @@ async function selectTarget(i,goal){
  i.managedHuntReady=selected&&i.livePos?.room===goal.mapId?[i.catalog().build,goal.mapId,goal.monsterId].join(':'):null;return selected;
 }
 async function tick(i,screen){
+ if(i.goal?.legendaryParty&&!require('../planning/legendary-party').proof(i,i.goal,Date.now(),{route:i.livePos?.room!==i.goal.mapId}).allowed)await i.expeditionAuto(false);
  if(i.v2?.trial?.active())return null;
  if(i.survivalRecovery||i.goal?.kind==='survival'||i.survivalStatus?.deaths?.length&&i.survivalStatus.until>Date.now())return null;
  if(i.endgameCampaign?.active&&i.endgameCampaign.phase!=='complete')return null;
@@ -17,6 +18,7 @@ async function tick(i,screen){
  if(i.goal?.kind==='main-quest'&&(!view.candidate||i.goal.questKey!==view.key)){i.campaignGoal=null;i.goal=null;i.huntMap=null;i.pendingTravel=null;i.refreshGoal?.();}
  const rare=require('../planning/rare-pet').assess(i,require('../economy').loadWiki(i.root),i.socialInbox?.last('bossboard'));i.rarePetPlan=rare;
  const growth=require('../planning/endgame-growth').assess(i,require('../economy').loadWiki(i.root),i.socialInbox?.last('bossboard'));
+ growth.candidates.unshift(...require('../planning/legendary-party').candidates(i,require('../economy').loadWiki(i.root)));
  if(i.goal?.kind==='equipment-drill'&&!growth.candidates.some(g=>g.kind==='equipment-drill'&&g.itemId===i.goal.itemId)){i.campaignGoal=null;i.goal=null;i.huntMap=null;i.refreshGoal?.();}
  const capped=i.lastSave?.lv>=i.catalog().world?.MAX_LV,quest=view.candidate?{...view.candidate,score:capped&&view.reward&&Object.keys(view.reward).every(k=>['exp','jexp','coins'].includes(k))?view.reward.coins>0?600:300:view.candidate.score}:null;
  const work=require('../planning/progression-work').assess(i,require('../economy').loadWiki(i.root),i.socialInbox?.last('bossboard'));i.progressionWork=work;
@@ -33,9 +35,11 @@ async function tick(i,screen){
  if(i.goal?.kind==='pet-unlock'&&(!candidate||candidate.kind!=='pet-unlock'||candidate.monsterId!==i.goal.monsterId)){i.campaignGoal=null;i.goal=null;i.huntMap=null;i.refreshGoal?.();}
  if(!candidate||screen.death||screen.panelOpen||i.pendingTravel)return null;
  const goal={...candidate,campaign:true};i.campaignGoal=goal;i.goal=goal;i.huntMap=goal.mapId;i.teamGoal=null;
+ if(goal.legendaryParty)await i.expeditionAuto(false);
  if(goal.kind==='craft-wait')await i.expeditionAuto(false);
  if(goal.kind==='team-gather'&&goal.alive===false)await i.expeditionAuto(false);
  if(goal.kind!=='craft-wait'&&goal.alive!==false&&i.livePos.room===goal.mapId&&i.canDo('mainQuestTarget',30000)&&await selectTarget(i,goal)){
+  if(goal.legendaryParty&&!require('../planning/legendary-party').proof(i,goal).allowed)return 'legendary party: waiting for fresh nearby tank/support and exact native targets';
   if(goal.firstClear){const r=await require('./class-boss-probe').run(i,goal);return 'bounded equipment miniboss: '+r.reason;}
   await i.expeditionAuto(!!goal.monsterId);
  }

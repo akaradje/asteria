@@ -30,7 +30,7 @@ function decorate(i,rows,now=Date.now()){
   if(g.kind==='astral-training'&&m?.exp>0&&astral?.state?.need>astral.state.exp){const left=astral.state.need-astral.state.exp;seconds=rate?left/(rate*m.exp)/1000:left/m.exp*(2+m.hp/5000);}
   const meta=i.competitiveMeta?.build===cat.build&&now>=i.competitiveMeta.at&&now-i.competitiveMeta.at<360000?i.competitiveMeta.targets?.find(t=>t.id===g.itemId):null;
   return {...g,metaBenchmark:meta?{benchmark:meta.benchmark,observedAt:meta.observedAt,estimatedBaseGain:meta.baseGain,optimalVerified:false}:null,combatRateMeasured:!!measuredRate,expectedCombatGain:gain,expectedDurationMs:g.expectedDurationMs??(Number.isFinite(seconds)?seconds*1000+Math.max(0,g.travelMs||g.acquisition?.travelMs||0):null)};
- });return rank(out,{context,now});
+ });return require('./legendary-acquisition').prioritize(rank(out,{context,now}),save,cat);
 }
 function rank(rows,{context={},now=Date.now()}={}){
  const decorated=rows.map((g,n)=>{

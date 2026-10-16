@@ -38,6 +38,9 @@ function portfolio(crafts,save,cat,wiki,benchmarks=new Set(),{blockedCraftIds=ne
  const hasReviewed=rows.some(reviewed);
  rows.sort((a,b)=>Number(reviewed(b))-Number(reviewed(a))||Number(!!b.goalPromotion)-Number(!!a.goalPromotion)||Number(a.acquisition.tier===3)-Number(b.acquisition.tier===3)||Number(b.fillsEmpty)-Number(a.fillsEmpty)||Number(b.ready)-Number(a.ready)||Number(b.ready&&b.type==='wing')-Number(a.ready&&a.type==='wing')||a.acquisition.tier-b.acquisition.tier||(Number.isFinite(a.completionPath.etaMs)&&Number.isFinite(b.completionPath.etaMs)?a.completionPath.etaMs-b.completionPath.etaMs:0)||b.acquisition.coverage-a.acquisition.coverage||b.valuePerCopper-a.valuePerCopper||b.gain-a.gain||a.id.localeCompare(b.id));
  if(require('../equipment-goal').policy(cat).dynamicProgression){const ranked=require('./combat-roi').rank(rows.map(r=>({...r,expectedCombatGain:r.gain,expectedDurationMs:r.ready?30000:r.completionPath?.etaMs})));rows.splice(0,rows.length,...ranked);}
+ const prioritized=require('./legendary-acquisition').prioritize(rows.filter(r=>r.acquisition.tier<3),save,cat);
+ const ordered=[...prioritized,...rows.filter(r=>r.acquisition.tier===3)];
+ if(require('../equipment-goal').policy(cat).dynamicProgression)rows.splice(0,rows.length,...ordered);
  const eligible=rows.filter(r=>!blockedCraftIds.has(r.id));
  const primary=eligible.find(r=>!r.acquisition.requirements.some(m=>m.protected))||null;
  const opportunity=require('../equipment-goal').policy(cat).dynamicProgression?null:require('./combat-priority').spareReady(primary,eligible,cat.build);

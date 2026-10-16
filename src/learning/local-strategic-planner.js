@@ -3,7 +3,8 @@ const contract=require('./proposal-contract'),policy=require('./autonomous-polic
 function choice(m,now){
  if(m.status!=='playing'||!m.actorId||!m.build||m.system?.sourceMatches===false||!Number.isFinite(m.saveAgeSeconds)||m.saveAgeSeconds<0||m.saveAgeSeconds>30)return null;
  const b=m.personalBrain||{},available=b.availableFocuses||[],investment=m.development?.investment?.selected;
- const ordered=[...(b.lowFunds?['focus_income']:[]),...(investment?.kind==='refine'?['focus_refine']:[]),...(b.craft?.ready?['focus_craft']:[]),...((m.legendaryCount??8)<8?['focus_gear']:[]),...(b.craft?.missing?.length?['focus_craft']:[]),'focus_refine','focus_gear','focus_craft','focus_growth'];
+ const missing=m.legendaryAcquisition?.missing?.length&&m.legendaryAcquisition?.targets?.length;
+ const ordered=[...(b.lowFunds?['focus_income']:[]),...(missing?[m.legendaryAcquisition.craft?.ready?'focus_craft':'focus_gear']:[]),...(investment?.kind==='refine'?['focus_refine']:[]),...(b.craft?.ready?['focus_craft']:[]),...((m.legendaryCount??8)<8?['focus_gear']:[]),...(b.craft?.missing?.length?['focus_craft']:[]),'focus_refine','focus_gear','focus_craft','focus_growth'];
  for(const action of [...new Set(ordered)]){
   if(!available.includes(action)||!policy.feasibleFocus(action,m))continue;
   const proposal=contract.verify({action,evidenceIds:contract.facts(m).filter(f=>['identity','observation','budget'].includes(f.kind)).map(f=>f.id),effects:[{kind:'evidence',direction:'observe',basis:'proposal_only'}],stopRule:{maxActiveMs:180000,maxDeaths:0,stopOnUncertain:true}},m,{snapshotAt:new Date(now).toISOString(),now});

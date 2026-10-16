@@ -2,7 +2,7 @@
 // Explicit reviewed offline suites; never enumerate/run live account scripts.
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),crypto=require('node:crypto');
 const suites=[
- 'progression-resilience','progression-lifecycle','build-id','material-budget-recovery','trade-budget-lifecycle','trade-no-dispatch',
+ 'legendary-acquisition','progression-resilience','progression-lifecycle','build-id','material-budget-recovery','trade-budget-lifecycle','trade-no-dispatch',
  'telemetry-recovery','purchase-rebase','authorized-grandmaster','grandmaster-intelligence','panel-security','native-semantic-contract','adaptive-progression','native-outcome-recovery','rolling-client-refresh','refine-supplies',
  'system-recovery','game-release-review','autonomous-controller','advisory-reload','character-command','dungeon-tick','brain-market-value','repair-host','repair-coordinator','astral-path','combat-progression-recovery','brain-market-receipts','promotion-execution',
  'brain-repair-pipeline','brain-atlas','brain-market-shadow','brain-policy-routing','brain-build-lab','brain-recovery-transition','brain-delivery','brain-dependency-time','brain-resource-flow','brain-fact-authority','brain-market-research','brain-evidence-store','brain-market-incidents','brain-admission-lookup','brain-knowledge-research','game-knowledge',

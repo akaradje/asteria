@@ -4,7 +4,7 @@ const active=r=>['STARTED','WAITING_CONFIRMATION','UNCERTAIN'].includes(r.status
 const receipts=require('./market-receipts');
 function target(i){
  const s=i.lastSave||{},w=i.catalog().world,next=economy.nextPromotion(s.job,w),a=w.ASCEND;
- if(!next||!w.HIGH_CLASSES?.[next]||a?.open!==true||s.lv<a.lv||s.jobLv<a.jobLv)return null;
+ if(!next||!w.HIGH_CLASSES?.[next]||a?.open!==true||s.lv<a.lv||s.jobLv<a.jobLv)return require('../planning/legendary-acquisition').materialObjective(i);
  const missing=Object.entries(a.items||{}).filter(([k,n])=>Number.isInteger(n)&&n>0&&(s.materials?.[k]||0)<n);
  return {next,missing,reserve:a.coins+Math.max(10000,(s.lv||1)*100)+28000};
 }
@@ -12,6 +12,7 @@ function safe(i,s,now=Date.now()){
  return i.status==='playing'&&!s.death&&!s.panelOpen&&!i.recycling&&!i.choresBusy&&!i.pendingTravel&&!i.teamControl&&!i.dailyTeamPending&&!i.dailyWorkStatus?.ownsNavigation&&!i.assistanceReservation&&!i.classBossProbeActive&&!i.survivalRecovery&&!i.v2?.trial?.active()&&i.v2?.sourceCoherence?.matches===true&&fresh.decisionGate(i,now).allowed&&fresh.fresh(i.vitals?.at,15000,now)&&i.vitals.hp>=.85&&!(i.teamTradeStatus?.phase&&!['IDLE','CONFIRMED','CANCELLED'].includes(i.teamTradeStatus.phase));
 }
 function purchaseDemand(i,item,now=Date.now()){
+ const personal=target(i);if(personal?.equipment)return Math.max(0,(personal.missing.find(([k])=>k===item)?.[1]||0)-(i.lastSave.materials?.[item]||0));
  const own=target(i),need=own?.missing.find(([k])=>k===item);if(!need)return 0;
  const party=i.socialInbox?.last('party');let total=need[1]-(i.lastSave.materials?.[item]||0);
  if(!party?.id||party._sessionBound!==true||require('./party-evidence').observedAt(party,now)===null)return total;
@@ -111,7 +112,7 @@ async function tick(i,s,{sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}){
  if(!receipts.validContext(dispatchContext)||!market||market.generation!==dispatchContext.generation||market.gap||market.inFlight||market.commandConflict||i.socialInbox.criticalGap||!Number.isSafeInteger(market.sequence)||!Number.isSafeInteger(market.commandSequence)||board._generation!==dispatchContext.generation||board._nativeMarket!==true)return null;
  const row=journal.begin('market-class',{item,listingId:r.id,n:r.n,price:r.price},i.lastSave,Date.now(),i.catalog().build);if(!row)return null;
  row.context={...row.context,...dispatchContext};row.marketContractVersion=2;row.marketBaselineSequence=market.sequence;row.marketCommandSequence=market.commandSequence;
- row.externalOwner='class-market';row.beforeMaterial=i.lastSave.materials?.[item]||0;row.claimId=row.id;journal.save();
+ row.externalOwner='class-market';if(current.equipment)row.legendaryObjective={goalId:current.goalId,slot:current.slot,maxSpend:current.maxSpend};row.beforeMaterial=i.lastSave.materials?.[item]||0;row.claimId=row.id;journal.save();
  const reserve=i.v2.reservations.reserve(row.claimId,{Copper:r.price},{Copper:i.lastSave.coins-current.reserve},{build:i.catalog().build});
  if(!reserve.ok){row.status='CANCELLED';journal.save();return null;}i.v2.reservations.started(row.claimId);i.v2.reservations.link(row.claimId,row.id);
  row.dispatchAt=Date.now();row.deadline=row.dispatchAt+30000;journal.save();

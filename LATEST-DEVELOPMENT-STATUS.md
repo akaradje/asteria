@@ -1,3 +1,11 @@
+## Missing-slot Legendary acquisition and guarded same-host party alternatives — 2026-10-16T18:24:07.252179+07:00 Asia/Bangkok
+
+Prioritize positive missing-slot Legendary equipment, preserve already-owned work and make solo level dead ends visible. Same-host native three-member tank/support parties may take a bounded field-miniboss route only with fresh identity/HP/supply/live-spawn/proximity proof; the original solo margin is unchanged. Reuse the existing v2 serialized material purchase executor for verified gap recipes within five percent of unreserved Copper and a fixed upper bound; no direct gear purchase without its exact supported receipt. Keep every original journal and uncertain UUID replay fence. Full regression and actual rollout readbacks are recorded separately. Windows untouched.
+
+## Missing-slot Legendary acquisition and guarded same-host party alternatives — 2026-10-16T18:13:42.321086+07:00 Asia/Bangkok
+
+Prioritize positive missing-slot Legendary equipment, preserve already-owned work and make solo level dead ends visible. Same-host native three-member tank/support parties may take a bounded field-miniboss route only with fresh identity/HP/supply/live-spawn/proximity proof; the original solo margin is unchanged. Reuse the existing v2 serialized material purchase executor for verified gap recipes within five percent of unreserved Copper and a fixed upper bound; no direct gear purchase without its exact supported receipt. Keep every original journal and uncertain UUID replay fence. Full regression and actual rollout readbacks are recorded separately. Windows untouched.
+
 ## Guarded six-actor resilience release verified — 2026-10-16 07:09 +07:00 Asia/Bangkok
 
 Farm42ea9e4bccd299edb331f5475f3a0cbe113eac1a44f6302732ca6d38769a44fb/fullf31adff96ac05be59a4a11ef13e92b5bea612307a477777a7cd0b395966e5ea7/native751aed14 is loaded on both registered remote teams; all six playing with coherent source and fresh authenticated same-session/generation readbacks, no active paid claims and advisor failures0. Controllers also reloaded their resident dependencies; original team-admission settings restoredtrue after final proof. Windows was not restarted or reloaded.
